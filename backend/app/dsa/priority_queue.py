@@ -1,40 +1,28 @@
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional
 import datetime
 
 class PriorityQueueEntry:
-    """
-    Container for passenger in the Priority Queue.
-    
-    Priority Policy Tuple:
-    (quota_rank, category_subweight, booking_timestamp, passenger_id)
-    Lower comparison value means HIGHER priority for allocation.
-    
-    Quota Ranks:
-    0: SS / Senior Citizen
-    1: LD / Ladies
-    2: GN / General
-    3: TQ / Tatkal (Typically Tatkal waitlist has distinct promotion logic)
-    """
+    # Quota ranking: SS (Senior) > LD (Ladies) > GN (General) > TQ (Tatkal)
     QUOTA_RANKS = {
-        "SS": 0,  # Senior Citizen / Lower Berth
-        "LD": 1,  # Ladies
-        "GN": 2,  # General
-        "TQ": 3   # Tatkal
+        "SS": 0,
+        "LD": 1,
+        "GN": 2,
+        "TQ": 3
     }
 
     def __init__(self, passenger_id: int, pnr: str, quota: str, age: int, timestamp: datetime.datetime, extra_data: Any = None):
-        self.passenger_id: int = passenger_id
-        self.pnr: str = pnr
-        self.quota: str = quota.upper()
-        self.age: int = age
-        self.timestamp: datetime.datetime = timestamp
-        self.extra_data: Any = extra_data
+        self.passenger_id = passenger_id
+        self.pnr = pnr
+        self.quota = quota.upper()
+        self.age = age
+        self.timestamp = timestamp
+        self.extra_data = extra_data
         
-        # Calculate comparison priority key
-        # We invert age so older passengers in same quota get priority
-        quota_rank = self.QUOTA_RANKS.get(self.quota, 2)
-        age_weight = -self.age if self.quota == "SS" else 0
-        self.priority_key = (quota_rank, age_weight, self.timestamp.timestamp(), self.passenger_id)
+        # tie breaker tuple: (quota, age_priority, booking_time, passenger_id)
+        # Note: -age gives priority to older passengers within senior quota
+        quota_weight = self.QUOTA_RANKS.get(self.quota, 2)
+        age_bonus = -self.age if self.quota == "SS" else 0
+        self.priority_key = (quota_weight, age_bonus, self.timestamp.timestamp(), self.passenger_id)
 
     def __lt__(self, other: 'PriorityQueueEntry') -> bool:
         return self.priority_key < other.priority_key
@@ -47,15 +35,7 @@ class PriorityQueueEntry:
 
 
 class PriorityQueue:
-    """
-    Custom Binary Min-Heap Implementation for Waiting-List Prioritization.
-    
-    Academic Complexity:
-    - Push: O(log N)
-    - Pop (extract min/highest priority): O(log N)
-    - Peek: O(1)
-    - Remove by passenger_id (cancellation): O(N) search + O(log N) heapify-down
-    """
+    """Min-heap implementation for waiting list auto-promotions."""
 
     def __init__(self):
         self.heap: List[PriorityQueueEntry] = []
@@ -84,13 +64,13 @@ class PriorityQueue:
     def _sift_down(self, i: int) -> None:
         min_idx = i
         n = len(self.heap)
-        l = self._left_child(i)
-        r = self._right_child(i)
+        left = self._left_child(i)
+        right = self._right_child(i)
 
-        if l < n and self.heap[l] < self.heap[min_idx]:
-            min_idx = l
-        if r < n and self.heap[r] < self.heap[min_idx]:
-            min_idx = r
+        if left < n and self.heap[left] < self.heap[min_idx]:
+            min_idx = left
+        if right < n and self.heap[right] < self.heap[min_idx]:
+            min_idx = right
 
         if min_idx != i:
             self.heap[i], self.heap[min_idx] = self.heap[min_idx], self.heap[i]
@@ -103,44 +83,40 @@ class PriorityQueue:
     def pop(self) -> Optional[PriorityQueueEntry]:
         if not self.heap:
             return None
-        root = self.heap[0]
-        last = self.heap.pop()
+        top = self.heap[0]
+        tail = self.heap.pop()
         if self.heap:
-            self.heap[0] = last
+            self.heap[0] = tail
             self._sift_down(0)
-        return root
+        return top
 
     def peek(self) -> Optional[PriorityQueueEntry]:
-        if not self.heap:
-            return None
-        return self.heap[0]
+        return self.heap[0] if self.heap else None
 
     def remove_by_passenger_id(self, passenger_id: int) -> Optional[PriorityQueueEntry]:
-        """Supports waitlist cancellation by removing a specific passenger."""
-        target_idx = -1
-        for idx, entry in enumerate(self.heap):
-            if entry.passenger_id == passenger_id:
-                target_idx = idx
+        # cancellation from waiting list
+        idx = -1
+        for i, item in enumerate(self.heap):
+            if item.passenger_id == passenger_id:
+                idx = i
                 break
 
-        if target_idx == -1:
+        if idx == -1:
             return None
 
-        removed = self.heap[target_idx]
-        last = self.heap.pop()
-        if target_idx < len(self.heap):
-            self.heap[target_idx] = last
-            self._sift_down(target_idx)
-            self._sift_up(target_idx)
+        removed = self.heap[idx]
+        tail = self.heap.pop()
+        if idx < len(self.heap):
+            self.heap[idx] = tail
+            self._sift_down(idx)
+            self._sift_up(idx)
         return removed
 
     def to_list(self) -> List[PriorityQueueEntry]:
-        """Returns sorted snapshot of elements without modifying original heap."""
-        temp_heap = list(self.heap)
-        sorted_elements = []
-        pq_copy = PriorityQueue()
-        pq_copy.heap = temp_heap
-        while not pq_copy.is_empty():
-            sorted_elements.append(pq_copy.pop())
-        return sorted_elements
-
+        # snapshot sorted without draining actual heap
+        copy = PriorityQueue()
+        copy.heap = list(self.heap)
+        res = []
+        while not copy.is_empty():
+            res.append(copy.pop())
+        return res
