@@ -32,3 +32,4 @@ updates:
       - "Debanjan110d"
     commit-message:
       prefix: "ci(actions-deps)"
+

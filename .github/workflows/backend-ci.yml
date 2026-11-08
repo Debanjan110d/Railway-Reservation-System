@@ -66,3 +66,4 @@ jobs:
           DATABASE_URL: "postgresql://postgres:postgrespassword@localhost:5432/railway_test"
         run: |
           pytest backend/app/tests/ -v --durations=10
+

@@ -9,3 +9,4 @@ httpx==0.28.1
 requests==2.34.2
 # Optional PostgreSQL driver for production/PostgreSQL CI environments
 psycopg2-binary>=2.9.9
+

@@ -23,3 +23,4 @@ Instead, please send an advisory directly to the repository maintainer:
    - CI runs against temporary, isolated service containers. Never point tests or automation at production databases.
 3. **Idempotency**:
    - Booking, cancellation, and payment simulation endpoints enforce idempotency keys to prevent race condition exploitation.
+
