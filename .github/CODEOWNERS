@@ -1,0 +1,22 @@
+# CODEOWNERS for Railway Reservation System
+# Protects core academic DSA implementations, reservation transaction logic,
+# database persistence, and CI/CD security workflows.
+# Syntax: <pattern> <@username or team>
+
+# Default Fallback Owner for entire repository
+* @Debanjan110d
+
+# Critical DSA Implementations (Academic Core)
+/backend/app/dsa/ @Debanjan110d
+
+# Core Reservation Engine, Allocation & Cancellation Services
+/backend/app/services/ @Debanjan110d
+
+# Relational Database Schema & Models
+/backend/app/models/ @Debanjan110d
+/backend/app/database/ @Debanjan110d
+
+# CI/CD Workflows & Repository Security
+/.github/ @Debanjan110d
+/run.sh @Debanjan110d
+/run.ps1 @Debanjan110d
