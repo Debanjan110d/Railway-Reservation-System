@@ -9,7 +9,7 @@ An academic Data Structures and Algorithms (DSA) project featuring custom berth 
 - **Frontend**: Next.js (React 19 + TypeScript + Tailwind CSS)
 - **Backend**: Python + FastAPI
 - **Database**: PostgreSQL / SQLite (with SQLAlchemy ORM)
-- **CI/CD & Automation**: GitHub Actions (`frontend-ci.yml`, `backend-ci.yml`, `dependabot.yml`)
+- **CI/CD & Automation**: GitHub Actions (`backend-ci.yml`, `dependabot.yml`)
 
 ---
 
@@ -54,17 +54,9 @@ chmod +x run.sh
 
 ## 4. Running Quality Checks Locally
 
-### Backend Tests
 ```bash
-# Set Python path and run full pytest suite
+# Run full pytest suite across DSA, API, and reservation workflows
 export PYTHONPATH=./backend
-pytest backend/app/tests/ -v
-```
-
-### Frontend Lint and Build
-```bash
-cd frontend
-npm run lint
-npm run build
+python -m pytest backend/app/tests/ -v
 ```
 
