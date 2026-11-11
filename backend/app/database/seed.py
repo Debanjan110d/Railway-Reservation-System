@@ -1,61 +1,91 @@
 import datetime
 from sqlalchemy.orm import Session
-from app.models.entities import Train, TrainRun, Coach, Berth
+from app.models.entities import Train, TrainRun, Coach, Berth, Booking, Passenger
 from app.database.connection import engine, Base, SessionLocal
 
-def seed_database():
+def reset_and_seed_database():
+    """
+    Completely cleans old dummy bookings and seeds realistic West Bengal / Kolkata
+    originating and terminating trains with clean coach layouts.
+    """
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
-        if db.query(Train).count() > 0:
-            print("Database already seeded.")
-            return
+        print("[*] Clearing all old bookings and passengers...")
+        db.query(Passenger).delete()
+        db.query(Booking).delete()
+        db.query(Berth).delete()
+        db.query(Coach).delete()
+        db.query(TrainRun).delete()
+        db.query(Train).delete()
+        db.commit()
 
-        print("Seeding Indian Railway demo trains and coaches...")
-        
-        # Train 1: 12301 Rajdhani Express
-        rajdhani = Train(
-            train_number="12301",
-            train_name="Rajdhani Express",
-            source_station="Howrah (HWH)",
-            destination_station="New Delhi (NDLS)",
-            total_coaches=3
-        )
-        # Train 2: 12002 Shatabdi Express
-        shatabdi = Train(
-            train_number="12002",
-            train_name="Bhopal Shatabdi Express",
-            source_station="New Delhi (NDLS)",
-            destination_station="Rani Kamalapati (RKMP)",
-            total_coaches=3
-        )
-        db.add_all([rajdhani, shatabdi])
-        db.flush()
+        print("[*] Seeding West Bengal & Kolkata Railway Fleet...")
+
+        kolkata_trains = [
+            {
+                "train_number": "12301",
+                "train_name": "Howrah - New Delhi Rajdhani Express",
+                "source": "Howrah (HWH)",
+                "destination": "New Delhi (NDLS)",
+                "coaches": [("A1", "2AC", 8), ("B1", "3AC", 12), ("S1", "SL", 16)]
+            },
+            {
+                "train_number": "22301",
+                "train_name": "Howrah - New Jalpaiguri Vande Bharat Express",
+                "source": "Howrah (HWH)",
+                "destination": "New Jalpaiguri (NJP)",
+                "coaches": [("C1", "CC", 12), ("C2", "CC", 12), ("E1", "EC", 8)]
+            },
+            {
+                "train_number": "12313",
+                "train_name": "Sealdah - New Delhi Rajdhani Express",
+                "source": "Sealdah (SDAH)",
+                "destination": "New Delhi (NDLS)",
+                "coaches": [("A1", "2AC", 8), ("B1", "3AC", 12), ("S1", "SL", 16)]
+            },
+            {
+                "train_number": "12019",
+                "train_name": "Howrah - Ranchi Shatabdi Express",
+                "source": "Howrah (HWH)",
+                "destination": "Ranchi (RNC)",
+                "coaches": [("C1", "CC", 12), ("C2", "CC", 12), ("A1", "2AC", 8)]
+            },
+            {
+                "train_number": "12837",
+                "train_name": "Howrah - Puri Superfast Express",
+                "source": "Howrah (HWH)",
+                "destination": "Puri (PURI)",
+                "coaches": [("A1", "2AC", 8), ("B1", "3AC", 12), ("S1", "SL", 16)]
+            }
+        ]
 
         today = datetime.date.today()
-        # Create runs for next 3 days
-        for t in [rajdhani, shatabdi]:
-            for day_offset in range(3):
+        berth_types = ["LOWER", "MIDDLE", "UPPER", "SIDE_LOWER", "SIDE_UPPER"]
+
+        for t_data in kolkata_trains:
+            train = Train(
+                train_number=t_data["train_number"],
+                train_name=t_data["train_name"],
+                source_station=t_data["source"],
+                destination_station=t_data["destination"],
+                total_coaches=len(t_data["coaches"])
+            )
+            db.add(train)
+            db.flush()
+
+            # Create scheduled runs for next 4 days
+            for day_offset in range(4):
                 run_date = today + datetime.timedelta(days=day_offset)
                 run = TrainRun(
-                    train_id=t.id,
+                    train_id=train.id,
                     run_date=run_date,
                     status="SCHEDULED"
                 )
                 db.add(run)
                 db.flush()
 
-                # Add coaches: A1 (2AC), B1 (3AC), S1 (Sleeper)
-                # Keep modest berth count (12 berths per coach) to allow quick demonstration
-                # of full occupation, RAC, and Waitlist handling in academic simulations
-                coaches_config = [
-                    ("A1", "2AC", 8),
-                    ("B1", "3AC", 12),
-                    ("S1", "SL", 16)
-                ]
-                berth_types = ["LOWER", "MIDDLE", "UPPER", "SIDE_LOWER", "SIDE_UPPER"]
-
-                for c_code, c_type, total_berths in coaches_config:
+                for c_code, c_type, total_berths in t_data["coaches"]:
                     coach = Coach(
                         train_run_id=run.id,
                         coach_code=c_code,
@@ -76,10 +106,24 @@ def seed_database():
                         db.add(berth)
 
         db.commit()
-        print("Database successfully initialized and seeded with Trains, Runs, Coaches, and Berths!")
+        print("[✓] Database successfully reset and seeded with Kolkata & West Bengal Trains!")
+        print(f"[✓] Total Trains: {len(kolkata_trains)} | Total Dummy Bookings: 0 (All Berths 100% Available)")
+    finally:
+        db.close()
+
+def seed_database():
+    """Default entrypoint called by scripts and launchers."""
+    db = SessionLocal()
+    try:
+        # If trains exist, check if they are already the Kolkata trains
+        hwh_train = db.query(Train).filter(Train.train_number == "22301").first()
+        if hwh_train and db.query(Booking).count() == 0:
+            print("Database already seeded with West Bengal trains and zero dummy bookings.")
+            return
+        # Otherwise, re-seed cleanly
+        reset_and_seed_database()
     finally:
         db.close()
 
 if __name__ == "__main__":
-    seed_database()
-
+    reset_and_seed_database()

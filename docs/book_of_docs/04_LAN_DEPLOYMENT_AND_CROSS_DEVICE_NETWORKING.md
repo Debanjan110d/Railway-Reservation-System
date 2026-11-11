@@ -125,3 +125,4 @@ The launcher detects the primary LAN IP and prints an interactive ASCII operatio
 | Mobile phone shows "Site unreachable" | Windows Defender Firewall blocking port 3000/8000 | In Windows Security, allow Node.js and Python through Private Networks, or run: `New-NetFirewallRule -DisplayName "RailDSA" -Direction Inbound -LocalPort 3000,8000 -Protocol TCP -Action Allow` in admin PowerShell. |
 | Host shows page, but buttons fail | Mobile cannot reach backend on port 8000 | Check that both `0.0.0.0:8000` and `0.0.0.0:3000` are bound and not blocked by router client-isolation. |
 | Mobile Hotspot isolation | Some public/college Wi-Fi networks block device-to-device traffic | Use a personal mobile hotspot where all devices are on the same subnet without AP client isolation. |
+

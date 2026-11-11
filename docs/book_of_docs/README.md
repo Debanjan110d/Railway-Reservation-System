@@ -76,3 +76,4 @@ flowchart TD
 - **Unit & Integration Suite:** 18 automated pytest test cases (`backend/app/tests/`)
 - **Frontend Engine:** Next.js 16 with Turbopack compilation ($<700\text{ms}$)
 - **Mathematical Formulations:** Polynomial Rolling Hash, FNV-1a, Kirsch-Mitzenmacher Bloom optimization, Binary Heap Sifting, Stable Divide-and-Conquer Merge.
+

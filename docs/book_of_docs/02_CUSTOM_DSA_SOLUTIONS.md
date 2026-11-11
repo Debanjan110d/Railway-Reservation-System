@@ -162,3 +162,4 @@ $$T(N) = 2 \cdot T\left(\frac{N}{2}\right) + \Theta(N)$$
 By the **Master Theorem** ($a = 2, b = 2, d = 1 \implies \log_b a = d$):
 
 $$T(N) = \Theta(N \log N)$$
+

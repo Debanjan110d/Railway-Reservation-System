@@ -35,6 +35,12 @@ import {
   UserPlus,
   Plus,
   Lock,
+  Sun,
+  Moon,
+  ArrowRightLeft,
+  MapPin,
+  Calendar,
+  Ticket,
 } from "lucide-react";
 
 export default function RailwayApp() {
@@ -42,6 +48,24 @@ export default function RailwayApp() {
   const [trains, setTrains] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Theme & User Color Palette Support (#425B9A, #76C0EC, #FFF6DC, #FF95A5)
+  const [theme, setTheme] = useState<"dark" | "light">("light");
+  const isLight = theme === "light";
+
+  // Dominant Route & Station Filtering
+  const [searchFrom, setSearchFrom] = useState("ALL");
+  const [searchTo, setSearchTo] = useState("ALL");
+  const [copiedPnr, setCopiedPnr] = useState<string | null>(null);
+
+  const copyPnrToClipboard = (pnrText: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(pnrText);
+      setCopiedPnr(pnrText);
+      notify("success", "PNR Copied!", `PNR ${pnrText} copied to clipboard.`);
+      setTimeout(() => setCopiedPnr(null), 2500);
+    }
+  };
 
   // Floating Toast Notifications System
   const [toasts, setToasts] = useState<
@@ -406,89 +430,141 @@ export default function RailwayApp() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div
+      className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${
+        isLight ? "bg-[#FFF6DC] text-[#425B9A]" : "bg-slate-950 text-slate-100"
+      }`}
+    >
       {/* Top Header */}
-      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
+      <header
+        className={`sticky top-0 z-50 px-6 py-4 flex items-center justify-between border-b transition-colors ${
+          isLight
+            ? "bg-[#425B9A] text-white border-[#76C0EC]/30 shadow-md"
+            : "bg-slate-900/90 text-white border-slate-800 backdrop-blur"
+        }`}
+      >
         <div className="flex items-center space-x-3">
           <img
             src="/icon.svg"
             alt="RailDSA Engine Logo"
-            className="h-11 w-11 rounded-xl shadow-lg shadow-indigo-500/25 hover:scale-105 transition-transform cursor-pointer"
+            className="h-11 w-11 rounded-xl shadow-lg hover:scale-105 transition-transform cursor-pointer bg-white/10 p-1"
           />
           <div>
-            <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-              RailDSA Engine
-            </h1>
-            <p className="text-xs text-indigo-400 font-medium tracking-wide">
-              Priority Waiting-List & In-Memory Hash/Heap Core
+            <div className="flex items-center space-x-2">
+              <h1 className="text-xl font-extrabold tracking-tight">RailDSA Engine</h1>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FF95A5] text-[#425B9A] uppercase tracking-wider">
+                Kolkata Hub
+              </span>
+            </div>
+            <p className="text-xs text-[#76C0EC] font-medium tracking-wide">
+              Eastern Railway In-Memory Hash/Heap Academic Engine
             </p>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <nav className="flex space-x-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
-          <button
-            onClick={() => setActiveTab("search")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2 ${
-              activeTab === "search"
-                ? "bg-indigo-600 text-white shadow"
-                : "text-slate-400 hover:text-white"
+        {/* Navigation Tabs & Theme Toggle */}
+        <div className="flex items-center space-x-2">
+          <nav
+            className={`flex space-x-1 p-1 rounded-xl border ${
+              isLight ? "bg-[#334677] border-[#76C0EC]/30" : "bg-slate-800/80 border-slate-700/60"
             }`}
           >
-            <Train className="h-4 w-4" />
-            <span>Search & Book</span>
-          </button>
+            <button
+              onClick={() => setActiveTab("search")}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 cursor-pointer ${
+                activeTab === "search"
+                  ? isLight
+                    ? "bg-[#76C0EC] text-[#425B9A] shadow"
+                    : "bg-indigo-600 text-white shadow"
+                  : "text-slate-300 hover:text-white"
+              }`}
+            >
+              <Train className="h-4 w-4" />
+              <span>Search & Book</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("pnr")}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 cursor-pointer ${
+                activeTab === "pnr"
+                  ? isLight
+                    ? "bg-[#76C0EC] text-[#425B9A] shadow"
+                    : "bg-indigo-600 text-white shadow"
+                  : "text-slate-300 hover:text-white"
+              }`}
+            >
+              <Search className="h-4 w-4" />
+              <span>PNR Status</span>
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab("chart");
+                if (!chartData && selectedRunId) handleLoadChart(selectedRunId);
+              }}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 cursor-pointer ${
+                activeTab === "chart"
+                  ? isLight
+                    ? "bg-[#76C0EC] text-[#425B9A] shadow"
+                    : "bg-indigo-600 text-white shadow"
+                  : "text-slate-300 hover:text-white"
+              }`}
+            >
+              <BarChart3 className="h-4 w-4" />
+              <span>Reservation Chart</span>
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab("dsa");
+                loadDSAMetrics();
+              }}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 cursor-pointer ${
+                activeTab === "dsa"
+                  ? isLight
+                    ? "bg-[#76C0EC] text-[#425B9A] shadow"
+                    : "bg-indigo-600 text-white shadow"
+                  : "text-slate-300 hover:text-white"
+              }`}
+            >
+              <Database className="h-4 w-4" />
+              <span>DSA Diagnostics</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("admin")}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1.5 cursor-pointer ${
+                activeTab === "admin"
+                  ? isLight
+                    ? "bg-[#76C0EC] text-[#425B9A] shadow"
+                    : "bg-indigo-600 text-white shadow"
+                  : "text-slate-300 hover:text-white"
+              }`}
+            >
+              <ShieldCheck className="h-4 w-4" />
+              <span>Admin Portal</span>
+            </button>
+          </nav>
+
+          {/* Theme Toggle Button */}
           <button
-            onClick={() => setActiveTab("pnr")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2 ${
-              activeTab === "pnr"
-                ? "bg-indigo-600 text-white shadow"
-                : "text-slate-400 hover:text-white"
+            onClick={() => setTheme((prev) => (prev === "dark" ? "light" : "dark"))}
+            className={`p-2 rounded-xl border flex items-center space-x-1.5 text-xs font-bold transition cursor-pointer ${
+              isLight
+                ? "bg-[#76C0EC] border-[#76C0EC] text-[#425B9A] hover:bg-[#68aed8]"
+                : "bg-slate-800 border-slate-700 text-slate-200 hover:text-white"
             }`}
+            title="Switch Theme (Light: Bengal Heritage #FFF6DC / #425B9A / #76C0EC / #FF95A5)"
           >
-            <Search className="h-4 w-4" />
-            <span>PNR Status</span>
+            {isLight ? (
+              <>
+                <Moon className="h-4 w-4 text-[#425B9A]" />
+                <span className="hidden md:inline">Dark</span>
+              </>
+            ) : (
+              <>
+                <Sun className="h-4 w-4 text-amber-400" />
+                <span className="hidden md:inline">Light</span>
+              </>
+            )}
           </button>
-          <button
-            onClick={() => {
-              setActiveTab("chart");
-              if (!chartData && selectedRunId) handleLoadChart(selectedRunId);
-            }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2 ${
-              activeTab === "chart"
-                ? "bg-indigo-600 text-white shadow"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <BarChart3 className="h-4 w-4" />
-            <span>Reservation Chart</span>
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab("dsa");
-              loadDSAMetrics();
-            }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2 ${
-              activeTab === "dsa"
-                ? "bg-indigo-600 text-white shadow"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <Database className="h-4 w-4" />
-            <span>DSA Diagnostics</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("admin")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2 ${
-              activeTab === "admin"
-                ? "bg-indigo-600 text-white shadow"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <ShieldCheck className="h-4 w-4" />
-            <span>Admin Portal</span>
-          </button>
-        </nav>
+        </div>
       </header>
 
       {/* Global Error Banner */}
@@ -505,486 +581,791 @@ export default function RailwayApp() {
       )}
 
       {/* Main Content View */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
         {/* ===================== TAB 1: SEARCH & BOOK ===================== */}
         {activeTab === "search" && (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left 5 Cols: Train List & Quota */}
-            <div className="lg:col-span-5 space-y-5">
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-base font-semibold flex items-center space-x-2">
-                    <Train className="h-4 w-4 text-indigo-400" />
-                    <span>Select Train & Run Date</span>
+          <div className="space-y-6">
+            {/* Dominant Hero Train & Route Search Console */}
+            <div
+              className={`rounded-3xl p-6 border shadow-xl transition-all ${
+                isLight
+                  ? "bg-white border-[#76C0EC]/50 shadow-[#425B9A]/5 text-[#425B9A]"
+                  : "bg-slate-900 border-slate-800 text-white"
+              }`}
+            >
+              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-5 border-b border-dashed border-slate-700/30">
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span
+                      className={`px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider ${
+                        isLight
+                          ? "bg-[#FF95A5] text-[#425B9A]"
+                          : "bg-indigo-600 text-white"
+                      }`}
+                    >
+                      Eastern Railway &bull; Kolkata Hub
+                    </span>
+                    <span className="text-xs font-bold text-emerald-500 flex items-center space-x-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span>100% Berths Available &amp; Zero Dummy Data</span>
+                    </span>
+                  </div>
+                  <h2 className="text-2xl font-black tracking-tight mt-1.5">
+                    Kolkata &amp; West Bengal Train Reservation
                   </h2>
-                  <button
-                    onClick={loadTrains}
-                    className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                  </button>
+                  <p className="text-xs opacity-80 mt-0.5">
+                    Fast-path booking powered by Custom Polynomial Hash Table &amp; Min-Heap Priority Queue
+                  </p>
                 </div>
 
-                <div className="space-y-3">
-                  {trains.map((t) => (
-                    <div
-                      key={t.id}
-                      className="border border-slate-800 rounded-xl p-3.5 bg-slate-950/50 hover:border-slate-700 transition"
+                {/* Route Selector Controls */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="flex items-center space-x-1.5">
+                    <span className="text-xs font-bold">From:</span>
+                    <select
+                      value={searchFrom}
+                      onChange={(e) => setSearchFrom(e.target.value)}
+                      className={`text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer ${
+                        isLight
+                          ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]"
+                          : "bg-slate-950 border-slate-800 text-white"
+                      }`}
                     >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <span className="font-bold text-indigo-400 text-sm">
-                              {t.train_number}
-                            </span>
-                            <span className="font-semibold text-sm">{t.train_name}</span>
-                          </div>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            {t.source_station} &rarr; {t.destination_station}
-                          </p>
-                        </div>
-                      </div>
+                      <option value="ALL">All Bengal Hubs</option>
+                      <option value="Howrah (HWH)">Howrah (HWH)</option>
+                      <option value="Sealdah (SDAH)">Sealdah (SDAH)</option>
+                    </select>
+                  </div>
 
-                      {/* Train Runs Buttons */}
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {t.runs.map((r: any) => (
-                          <button
-                            key={r.run_id}
-                            onClick={() => handleRunSelect(t, r)}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition flex items-center space-x-2 ${
-                              selectedRunId === r.run_id
-                                ? "bg-indigo-600/30 border-indigo-500 text-indigo-200"
-                                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200"
-                            }`}
-                          >
-                            <span>{r.run_date}</span>
-                            <span
-                              className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                                r.available_berths > 0
-                                  ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
-                                  : "bg-amber-950 text-amber-400 border border-amber-800"
-                              }`}
-                            >
-                              {r.available_berths > 0
-                                ? `AVL ${r.available_berths}`
-                                : "WL / RAC"}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                  <button
+                    onClick={() => {
+                      const prevFrom = searchFrom;
+                      setSearchFrom(searchTo === "ALL" ? "Howrah (HWH)" : searchTo);
+                      setSearchTo(prevFrom === "ALL" ? "ALL" : prevFrom);
+                    }}
+                    className={`p-2 rounded-xl border transition cursor-pointer ${
+                      isLight
+                        ? "bg-[#76C0EC]/20 border-[#76C0EC] hover:bg-[#76C0EC]/40 text-[#425B9A]"
+                        : "bg-slate-800 border-slate-700 hover:bg-slate-700 text-white"
+                    }`}
+                    title="Swap route stations"
+                  >
+                    <ArrowRightLeft className="h-4 w-4" />
+                  </button>
+
+                  <div className="flex items-center space-x-1.5">
+                    <span className="text-xs font-bold">To:</span>
+                    <select
+                      value={searchTo}
+                      onChange={(e) => setSearchTo(e.target.value)}
+                      className={`text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer ${
+                        isLight
+                          ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]"
+                          : "bg-slate-950 border-slate-800 text-white"
+                      }`}
+                    >
+                      <option value="ALL">All Destinations</option>
+                      <option value="New Delhi (NDLS)">New Delhi (NDLS)</option>
+                      <option value="New Jalpaiguri (NJP)">New Jalpaiguri (NJP)</option>
+                      <option value="Puri (PURI)">Puri (PURI)</option>
+                      <option value="Ranchi (RNC)">Ranchi (RNC)</option>
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={loadTrains}
+                    className={`px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center space-x-1.5 transition cursor-pointer ${
+                      isLight
+                        ? "bg-[#425B9A] text-white border-[#425B9A] hover:bg-[#34487b]"
+                        : "bg-indigo-600 text-white border-indigo-500 hover:bg-indigo-500"
+                    }`}
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+                    <span>Refresh</span>
+                  </button>
                 </div>
               </div>
 
-              {/* Quota Selection */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-                <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center space-x-2">
-                  <ShieldCheck className="h-4 w-4 text-indigo-400" />
-                  <span>Reservation Quota Prioritization</span>
-                </h3>
-                <div className="grid grid-cols-2 gap-2 text-xs">
+              {/* Quota Strip */}
+              <div className="pt-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+                <span className="text-xs font-extrabold uppercase tracking-wider flex items-center space-x-1.5">
+                  <ShieldCheck className="h-4 w-4 text-[#76C0EC]" />
+                  <span>Quota Prioritization:</span>
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full md:w-auto">
                   {[
-                    { id: "GN", name: "General (GN)", desc: "Standard priority" },
-                    { id: "SS", name: "Senior Citizen (SS)", desc: "Priority 1 for allocation" },
-                    { id: "LD", name: "Ladies Quota (LD)", desc: "Priority 2 for allocation" },
-                    { id: "TQ", name: "Tatkal (TQ)", desc: "Short-notice waitlist" },
+                    { id: "GN", name: "General (GN)", sub: "Standard FCFS" },
+                    { id: "SS", name: "Senior Citizen (SS)", sub: "Priority 1 Min-Heap" },
+                    { id: "LD", name: "Ladies Quota (LD)", sub: "Priority 2 Min-Heap" },
+                    { id: "TQ", name: "Tatkal (TQ)", sub: "Fast Waitlist Pool" },
                   ].map((q) => (
                     <button
                       key={q.id}
                       onClick={() => setQuota(q.id)}
-                      className={`p-3 rounded-xl border text-left transition ${
+                      className={`px-3.5 py-2 rounded-xl border text-left transition cursor-pointer ${
                         quota === q.id
-                          ? "bg-indigo-600/20 border-indigo-500 text-white"
-                          : "bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700"
+                          ? isLight
+                            ? "bg-[#425B9A] border-[#425B9A] text-white shadow-md ring-2 ring-[#76C0EC]/50"
+                            : "bg-indigo-600 border-indigo-500 text-white shadow-md"
+                          : isLight
+                          ? "bg-[#FFF6DC] border-[#76C0EC]/50 text-[#425B9A] hover:bg-[#76C0EC]/20"
+                          : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
                       }`}
                     >
-                      <div className="font-semibold">{q.name}</div>
-                      <div className="text-[10px] text-slate-500 mt-1">{q.desc}</div>
+                      <div className="font-extrabold text-xs">{q.name}</div>
+                      <div className="text-[10px] opacity-80">{q.sub}</div>
                     </button>
                   ))}
                 </div>
               </div>
             </div>
 
-            {/* Right 7 Cols: Passenger Details & Live Coach Map */}
-            <div className="lg:col-span-7 space-y-5">
-              {/* Live Coach Berth Layout Map */}
-              {coachLayout && (
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-                  <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-sm font-semibold text-slate-300">
-                      Live Coach Layout: {coachLayout.train_name} ({coachLayout.train_number})
+            {/* Split Grid: Left Trains List, Right Coach & Passenger Form */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left 5 Cols: West Bengal Trains */}
+              <div className="lg:col-span-5 space-y-4">
+                <div
+                  className={`rounded-2xl p-5 border shadow-xl transition-all ${
+                    isLight
+                      ? "bg-white border-[#76C0EC]/50 text-[#425B9A]"
+                      : "bg-slate-900 border-slate-800 text-white"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3.5">
+                    <h2 className="text-base font-extrabold flex items-center space-x-2">
+                      <Train className="h-4 w-4 text-[#76C0EC]" />
+                      <span>Select Train &amp; Schedule</span>
                     </h2>
-                    <span className="text-xs text-slate-400">Date: {coachLayout.run_date}</span>
+                    <span className="text-xs font-semibold opacity-75">
+                      {trains.filter((t) => {
+                        if (searchFrom !== "ALL" && !t.source_station.toLowerCase().includes(searchFrom.toLowerCase())) return false;
+                        if (searchTo !== "ALL" && !t.destination_station.toLowerCase().includes(searchTo.toLowerCase())) return false;
+                        return true;
+                      }).length} Trains Available
+                    </span>
                   </div>
 
-                  <div className="space-y-4">
-                    {coachLayout.coaches.map((c: any) => (
-                      <div
-                        key={c.coach_code}
-                        className="bg-slate-950/60 border border-slate-800 rounded-xl p-3"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-bold text-indigo-300">
-                            Coach {c.coach_code} ({c.coach_type})
-                          </span>
-                          <span className="text-[10px] text-slate-500">
-                            Total Berths: {c.total_berths}
-                          </span>
-                        </div>
-                        {/* Berths Grid */}
-                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5">
-                          {c.berths.map((b: any) => {
-                            let badgeBg = "bg-emerald-950/60 border-emerald-800 text-emerald-300";
-                            if (b.status === "HELD")
-                              badgeBg = "bg-amber-950/60 border-amber-800 text-amber-300";
-                            else if (b.status === "CONFIRMED")
-                              badgeBg = "bg-rose-950/60 border-rose-800 text-rose-300";
-
-                            return (
-                              <div
-                                key={b.id}
-                                className={`border rounded-lg p-1.5 text-center transition ${badgeBg}`}
-                              >
-                                <div className="text-[11px] font-bold">{b.berth_number}</div>
-                                <div className="text-[9px] opacity-75">{b.berth_type[0]}</div>
+                  <div className="space-y-3">
+                    {trains
+                      .filter((t) => {
+                        if (searchFrom !== "ALL" && !t.source_station.toLowerCase().includes(searchFrom.toLowerCase())) return false;
+                        if (searchTo !== "ALL" && !t.destination_station.toLowerCase().includes(searchTo.toLowerCase())) return false;
+                        return true;
+                      })
+                      .map((t) => {
+                        const isSelectedTrain = selectedTrain?.id === t.id;
+                        return (
+                          <div
+                            key={t.id}
+                            className={`rounded-xl p-3.5 border transition-all ${
+                              isSelectedTrain
+                                ? isLight
+                                  ? "bg-[#FFF6DC]/70 border-2 border-[#425B9A] shadow-md ring-2 ring-[#76C0EC]/30"
+                                  : "bg-indigo-950/40 border-2 border-indigo-500 shadow-md ring-2 ring-indigo-500/20"
+                                : isLight
+                                ? "bg-white border-[#76C0EC]/40 hover:border-[#425B9A]/60 shadow-sm"
+                                : "bg-slate-950/60 border-slate-800 hover:border-slate-700"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <div className="flex items-center space-x-2">
+                                  <span
+                                    className={`font-mono font-extrabold text-xs px-2 py-0.5 rounded-lg ${
+                                      isLight
+                                        ? "bg-[#425B9A] text-white"
+                                        : "bg-indigo-950 text-indigo-300 border border-indigo-800"
+                                    }`}
+                                  >
+                                    {t.train_number}
+                                  </span>
+                                  <span className="font-extrabold text-sm">{t.train_name}</span>
+                                </div>
+                                <div className="flex items-center space-x-2 text-xs opacity-80 mt-1 font-medium">
+                                  <MapPin className="h-3 w-3 text-[#76C0EC]" />
+                                  <span>{t.source_station}</span>
+                                  <span>&rarr;</span>
+                                  <span>{t.destination_station}</span>
+                                </div>
                               </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center space-x-4 mt-3 text-[11px] text-slate-400 pt-2 border-t border-slate-800">
-                    <span className="flex items-center space-x-1.5">
-                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-                      <span>Available</span>
-                    </span>
-                    <span className="flex items-center space-x-1.5">
-                      <span className="h-2.5 w-2.5 rounded-full bg-amber-500"></span>
-                      <span>Held (5m TTL)</span>
-                    </span>
-                    <span className="flex items-center space-x-1.5">
-                      <span className="h-2.5 w-2.5 rounded-full bg-rose-500"></span>
-                      <span>Confirmed</span>
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Passenger Booking Entry & Hold Status */}
-              {!holdResult && !bookingConfirmed && (
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
-                  <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2.5 bg-indigo-950/80 border border-indigo-700/60 rounded-xl text-indigo-400 shadow-inner">
-                        <Users className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <h3 className="text-base font-bold text-white tracking-wide">Passenger Details</h3>
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-800">
-                            Quota: {quota}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          Enter passenger details as per official government identification (Max 4 per PNR)
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleAddPassenger}
-                      disabled={passengers.length >= 4}
-                      className="px-3.5 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/50 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold rounded-xl text-indigo-300 transition flex items-center space-x-1.5 shadow-sm"
-                    >
-                      <UserPlus className="h-3.5 w-3.5" />
-                      <span>Add Passenger ({passengers.length}/4)</span>
-                    </button>
-                  </div>
-
-                  {/* Passenger Cards */}
-                  <div className="space-y-3.5">
-                    {passengers.map((p, idx) => {
-                      const isSenior = p.age >= 60;
-                      return (
-                        <div
-                          key={idx}
-                          className="p-4 bg-slate-950/70 border border-slate-800 hover:border-slate-700 rounded-2xl transition shadow-sm space-y-3"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2.5">
-                              <span className="w-6 h-6 rounded-full bg-indigo-950 border border-indigo-600/70 flex items-center justify-center text-xs font-bold text-indigo-300">
-                                {idx + 1}
-                              </span>
-                              <span className="text-xs font-bold text-slate-200">
-                                {idx === 0 ? "Primary Passenger (Adult)" : `Passenger #${idx + 1}`}
-                              </span>
-                              {isSenior && (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800 flex items-center space-x-1">
-                                  <span>✓ Senior Citizen (SS Priority)</span>
-                                </span>
-                              )}
-                              {p.gender === "F" && quota === "LD" && (
-                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-950/80 text-purple-400 border border-purple-800">
-                                  Ladies Quota Applied
-                                </span>
-                              )}
-                            </div>
-                            {passengers.length > 1 && (
-                              <button
-                                onClick={() => handleRemovePassenger(idx)}
-                                className="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-950/30 transition text-xs flex items-center space-x-1"
-                                title="Remove passenger"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                                <span className="text-[11px]">Remove</span>
-                              </button>
-                            )}
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 pt-1">
-                            {/* Full Name */}
-                            <div className="sm:col-span-5">
-                              <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
-                                Full Name (Govt ID)
-                              </label>
-                              <input
-                                type="text"
-                                placeholder="e.g. Rahul Sharma"
-                                value={p.name}
-                                onChange={(e) => handlePassengerChange(idx, "name", e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 transition outline-none"
-                              />
                             </div>
 
-                            {/* Age */}
-                            <div className="sm:col-span-2">
-                              <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
-                                Age (Yrs)
-                              </label>
-                              <input
-                                type="number"
-                                min={1}
-                                max={120}
-                                placeholder="30"
-                                value={p.age}
-                                onChange={(e) =>
-                                  handlePassengerChange(idx, "age", parseInt(e.target.value) || 0)
-                                }
-                                className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-3 py-2 text-xs text-white transition outline-none font-mono"
-                              />
-                            </div>
-
-                            {/* Gender */}
-                            <div className="sm:col-span-2">
-                              <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
-                                Gender
-                              </label>
-                              <select
-                                value={p.gender}
-                                onChange={(e) => handlePassengerChange(idx, "gender", e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-2.5 py-2 text-xs text-white transition outline-none cursor-pointer"
-                              >
-                                <option value="M">Male</option>
-                                <option value="F">Female</option>
-                                <option value="O">Other</option>
-                              </select>
-                            </div>
-
-                            {/* Berth Preference */}
-                            <div className="sm:col-span-3">
-                              <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
-                                Berth Preference
-                              </label>
-                              <select
-                                value={p.berth_preference}
-                                onChange={(e) =>
-                                  handlePassengerChange(idx, "berth_preference", e.target.value)
-                                }
-                                className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-2.5 py-2 text-xs text-white transition outline-none cursor-pointer"
-                              >
-                                <option value="NO_PREF">No Preference</option>
-                                <option value="LOWER">Lower Berth</option>
-                                <option value="MIDDLE">Middle Berth</option>
-                                <option value="UPPER">Upper Berth</option>
-                                <option value="SIDE_LOWER">Side Lower</option>
-                                <option value="SIDE_UPPER">Side Upper</option>
-                              </select>
+                            {/* Scheduled Runs */}
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {t.runs.map((r: any) => {
+                                const isSelectedRun = selectedRunId === r.run_id;
+                                return (
+                                  <button
+                                    key={r.run_id}
+                                    onClick={() => handleRunSelect(t, r)}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center space-x-1.5 cursor-pointer ${
+                                      isSelectedRun
+                                        ? isLight
+                                          ? "bg-[#425B9A] text-white border-[#425B9A] shadow-sm"
+                                          : "bg-indigo-600 text-white border-indigo-500 shadow-sm"
+                                        : isLight
+                                        ? "bg-white border-[#76C0EC]/50 text-[#425B9A] hover:bg-[#76C0EC]/20"
+                                        : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white"
+                                    }`}
+                                  >
+                                    <span>{r.run_date}</span>
+                                    <span
+                                      className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold ${
+                                        r.available_berths > 0
+                                          ? isLight
+                                            ? "bg-[#76C0EC]/30 text-[#425B9A]"
+                                            : "bg-emerald-950 text-emerald-400 border border-emerald-800"
+                                          : isLight
+                                          ? "bg-[#FF95A5] text-white"
+                                          : "bg-amber-950 text-amber-400 border border-amber-800"
+                                      }`}
+                                    >
+                                      {r.available_berths > 0
+                                        ? `AVL ${r.available_berths}`
+                                        : "WL"}
+                                    </span>
+                                  </button>
+                                );
+                              })}
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Summary & Pricing Bar */}
-                  <div className="p-4 bg-slate-950/80 border border-slate-800/80 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <div className="flex items-center space-x-4">
-                      <div>
-                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Total Fare</span>
-                        <div className="text-lg font-bold text-emerald-400">
-                          ₹{500 * passengers.length}{" "}
-                          <span className="text-xs font-normal text-slate-400">
-                            ({passengers.length} × ₹500 base)
-                          </span>
-                        </div>
-                      </div>
-                      <div className="h-8 w-px bg-slate-800 hidden sm:block"></div>
-                      <div className="hidden sm:block">
-                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Allocated Policy</span>
-                        <span className="text-xs text-slate-300 font-medium">
-                          {quota === "SS"
-                            ? "Priority 1 (Senior Citizen Min-Heap)"
-                            : quota === "LD"
-                            ? "Priority 2 (Ladies Quota Min-Heap)"
-                            : quota === "TQ"
-                            ? "Tatkal Dynamic Pool"
-                            : "General First-Come First-Served"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={handleHoldBooking}
-                      disabled={loading || !selectedRunId}
-                      className="w-full sm:w-auto px-6 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl shadow-lg shadow-indigo-600/20 transition text-xs flex items-center justify-center space-x-2 cursor-pointer"
-                    >
-                      <Lock className="h-3.5 w-3.5" />
-                      <span>Proceed to Seat Hold (5 Min TTL)</span>
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
+                        );
+                      })}
                   </div>
                 </div>
-              )}
+              </div>
 
-              {/* Temporary Hold Modal / Section */}
-              {holdResult && !bookingConfirmed && (
-                <div className="bg-slate-900 border-2 border-indigo-500/80 rounded-2xl p-6 shadow-2xl">
-                  <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-                    <div>
-                      <span className="text-xs uppercase tracking-wider text-amber-400 font-bold flex items-center space-x-1.5">
-                        <Clock className="h-4 w-4" />
-                        <span>Seat Hold Active (Status: {holdResult.booking_status})</span>
+              {/* Right 7 Cols: Live Coach Layout & Passenger Details */}
+              <div className="lg:col-span-7 space-y-5">
+                {/* Live Coach Berth Layout Map */}
+                {coachLayout && (
+                  <div
+                    className={`rounded-2xl p-5 border shadow-xl transition-all ${
+                      isLight
+                        ? "bg-white border-[#76C0EC]/50 text-[#425B9A]"
+                        : "bg-slate-900 border-slate-800 text-white"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-3 pb-2 border-b border-dashed border-slate-700/30">
+                      <div>
+                        <h2 className="text-sm font-extrabold">
+                          Live Coach Layout: {coachLayout.train_name} ({coachLayout.train_number})
+                        </h2>
+                        <span className="text-xs opacity-75">Date: {coachLayout.run_date}</span>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 border border-emerald-500/30">
+                        In-Memory Grid
                       </span>
-                      <h3 className="text-xl font-extrabold text-white mt-1">
-                        PNR: {holdResult.pnr}
-                      </h3>
                     </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-mono font-bold text-amber-400">
-                        {Math.floor(holdTimeLeft / 60)}:
-                        {(holdTimeLeft % 60).toString().padStart(2, "0")}
-                      </div>
-                      <span className="text-[10px] text-slate-400">Time to Complete Payment</span>
-                    </div>
-                  </div>
 
-                  <div className="py-4 space-y-2">
-                    <h4 className="text-xs font-semibold text-slate-400 uppercase">
-                      Held Berths / Waiting Allocations:
-                    </h4>
-                    {holdResult.passengers.map((p: any) => (
-                      <div
-                        key={p.id}
-                        className="flex items-center justify-between bg-slate-950 p-2.5 rounded-lg text-xs"
-                      >
-                        <span className="font-semibold text-slate-200">{p.name}</span>
-                        <span
-                          className={`font-mono font-bold px-2 py-0.5 rounded text-[11px] ${
-                            p.status === "HELD_CNF"
-                              ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
-                              : "bg-amber-950 text-amber-400 border border-amber-800"
+                    <div className="space-y-4">
+                      {coachLayout.coaches.map((c: any) => (
+                        <div
+                          key={c.coach_code}
+                          className={`rounded-xl p-3 border ${
+                            isLight
+                              ? "bg-[#FFF6DC]/40 border-[#76C0EC]/40"
+                              : "bg-slate-950/60 border-slate-800"
                           }`}
                         >
-                          {p.status === "HELD_CNF"
-                            ? `Berth: ${p.coach_code || "S1"}-${p.berth_number} (${p.berth_type})`
-                            : `Waiting List: WL #${p.wl_number || 1}`}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-black">
+                              Coach {c.coach_code} ({c.coach_type})
+                            </span>
+                            <span className="text-[10px] opacity-75 font-semibold">
+                              Total Berths: {c.total_berths}
+                            </span>
+                          </div>
+                          {/* Berths Grid */}
+                          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5">
+                            {c.berths.map((b: any) => {
+                              let badgeBg = isLight
+                                ? "bg-white text-[#425B9A] border-[#76C0EC]/60 hover:border-[#425B9A]"
+                                : "bg-emerald-950/60 border-emerald-800 text-emerald-300";
 
-                  {/* Payment Simulator Actions */}
-                  <div className="pt-2 border-t border-slate-800 flex items-center space-x-3">
-                    <button
-                      onClick={() => handlePayment(true)}
-                      disabled={loading}
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-xl transition text-xs flex items-center justify-center space-x-2"
-                    >
-                      <CreditCard className="h-4 w-4" />
-                      <span>Simulate Successful Payment (₹{500 * holdResult.passengers.length})</span>
-                    </button>
-                    <button
-                      onClick={() => handlePayment(false)}
-                      disabled={loading}
-                      className="bg-rose-950 hover:bg-rose-900 border border-rose-800 text-rose-300 px-4 py-2.5 rounded-xl transition text-xs"
-                    >
-                      Simulate Failure
-                    </button>
-                  </div>
-                </div>
-              )}
+                              if (b.status === "HELD")
+                                badgeBg = isLight
+                                  ? "bg-[#FF95A5]/30 border-[#FF95A5] text-[#425B9A] font-bold"
+                                  : "bg-amber-950/60 border-amber-800 text-amber-300";
+                              else if (b.status === "CONFIRMED")
+                                badgeBg = isLight
+                                  ? "bg-[#425B9A] text-white border-[#425B9A]"
+                                  : "bg-rose-950/60 border-rose-800 text-rose-300";
 
-              {/* Booking Confirmation Card */}
-              {bookingConfirmed && (
-                <div className="bg-slate-900 border-2 border-emerald-500 rounded-2xl p-6 shadow-2xl">
-                  <div className="flex items-center space-x-3 mb-4">
-                    <CheckCircle className="h-8 w-8 text-emerald-400" />
-                    <div>
-                      <h3 className="text-lg font-bold text-white">
-                        Booking Finalized! PNR: {bookingConfirmed.pnr}
-                      </h3>
-                      <p className="text-xs text-emerald-400 font-medium">
-                        Indexed in Custom PNR Hash Table & Bloom Filter
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 mb-4">
-                    {bookingConfirmed.passengers.map((p: any) => (
-                      <div
-                        key={p.id}
-                        className="bg-slate-950 p-3 rounded-xl flex items-center justify-between text-xs"
-                      >
-                        <div>
-                          <div className="font-semibold text-white">{p.name}</div>
-                          <div className="text-[10px] text-slate-400">
-                            Age: {p.age} | Gender: {p.gender}
+                              return (
+                                <div
+                                  key={b.id}
+                                  className={`border rounded-lg p-1.5 text-center transition ${badgeBg}`}
+                                >
+                                  <div className="text-[11px] font-black">{b.berth_number}</div>
+                                  <div className="text-[9px] opacity-80 font-bold">{b.berth_type[0]}</div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
-                        <div className="text-right">
+                      ))}
+                    </div>
+
+                    <div className="flex items-center space-x-4 mt-3 text-[11px] pt-2 border-t border-dashed border-slate-700/30">
+                      <span className="flex items-center space-x-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                        <span className="font-semibold">Available</span>
+                      </span>
+                      <span className="flex items-center space-x-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#FF95A5]"></span>
+                        <span className="font-semibold">Held (5m TTL)</span>
+                      </span>
+                      <span className="flex items-center space-x-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#425B9A]"></span>
+                        <span className="font-semibold">Confirmed</span>
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Passenger Booking Entry (MakeMyTrip / ConfirmTkt Style) */}
+                {!holdResult && !bookingConfirmed && (
+                  <div
+                    className={`rounded-2xl p-6 border shadow-xl space-y-5 transition-all ${
+                      isLight
+                        ? "bg-white border-[#76C0EC]/50 text-[#425B9A]"
+                        : "bg-slate-900 border-slate-800 text-white"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between pb-4 border-b border-dashed border-slate-700/30">
+                      <div className="flex items-center space-x-3">
+                        <div
+                          className={`p-2.5 rounded-xl border ${
+                            isLight
+                              ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]"
+                              : "bg-indigo-950/80 border-indigo-700 text-indigo-400"
+                          }`}
+                        >
+                          <Users className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <h3 className="text-base font-extrabold tracking-wide">
+                              Passenger Details
+                            </h3>
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                                isLight
+                                  ? "bg-[#FF95A5] text-[#425B9A]"
+                                  : "bg-indigo-950 text-indigo-300 border border-indigo-800"
+                              }`}
+                            >
+                              Quota: {quota}
+                            </span>
+                          </div>
+                          <p className="text-xs opacity-75 mt-0.5 font-medium">
+                            Authorized IRCTC-grade reservation format (Max 4 per PNR)
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleAddPassenger}
+                        disabled={passengers.length >= 4}
+                        className={`px-3.5 py-2 border disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
+                          isLight
+                            ? "bg-[#76C0EC]/20 hover:bg-[#76C0EC]/40 border-[#76C0EC] text-[#425B9A]"
+                            : "bg-indigo-600/20 hover:bg-indigo-600/30 border-indigo-500/50 text-indigo-300"
+                        }`}
+                      >
+                        <UserPlus className="h-3.5 w-3.5" />
+                        <span>Add Passenger ({passengers.length}/4)</span>
+                      </button>
+                    </div>
+
+                    {/* Passenger Cards */}
+                    <div className="space-y-3.5">
+                      {passengers.map((p, idx) => {
+                        const isSenior = p.age >= 60;
+                        return (
+                          <div
+                            key={idx}
+                            className={`p-4 rounded-2xl border transition-all space-y-3 shadow-sm ${
+                              isLight
+                                ? "bg-[#FFF6DC]/40 border-[#76C0EC]/50 hover:border-[#425B9A]"
+                                : "bg-slate-950/70 border-slate-800 hover:border-slate-700"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-2.5">
+                                <span
+                                  className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${
+                                    isLight
+                                      ? "bg-[#425B9A] text-white"
+                                      : "bg-indigo-950 text-indigo-300 border border-indigo-600"
+                                  }`}
+                                >
+                                  {idx + 1}
+                                </span>
+                                <span className="text-xs font-extrabold">
+                                  {idx === 0 ? "Primary Passenger (Adult 12+ yrs)" : `Passenger #${idx + 1}`}
+                                </span>
+                                {isSenior && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/20 text-emerald-600 border border-emerald-500/40 flex items-center space-x-1">
+                                    <span>✓ Senior Citizen (SS Priority Applied)</span>
+                                  </span>
+                                )}
+                                {p.gender === "F" && quota === "LD" && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-600 border border-purple-500/40">
+                                    Ladies Quota Applied
+                                  </span>
+                                )}
+                              </div>
+                              {passengers.length > 1 && (
+                                <button
+                                  onClick={() => handleRemovePassenger(idx)}
+                                  className="text-rose-500 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-100/50 transition text-xs flex items-center space-x-1 cursor-pointer"
+                                  title="Remove passenger"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  <span className="text-[11px] font-bold">Remove</span>
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 pt-1">
+                              {/* Full Name */}
+                              <div className="sm:col-span-5">
+                                <label className="block text-[11px] font-bold mb-1 opacity-80">
+                                  Full Name (As per Govt ID Card)
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Sourav Ganguly"
+                                  value={p.name}
+                                  onChange={(e) => handlePassengerChange(idx, "name", e.target.value)}
+                                  className={`w-full rounded-xl px-3 py-2 text-xs font-semibold transition outline-none border ${
+                                    isLight
+                                      ? "bg-white border-[#76C0EC] text-[#425B9A] focus:border-[#425B9A]"
+                                      : "bg-slate-900 border-slate-800 text-white focus:border-indigo-500"
+                                  }`}
+                                />
+                              </div>
+
+                              {/* Age */}
+                              <div className="sm:col-span-2">
+                                <label className="block text-[11px] font-bold mb-1 opacity-80">
+                                  Age (Yrs)
+                                </label>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={120}
+                                  placeholder="30"
+                                  value={p.age}
+                                  onChange={(e) =>
+                                    handlePassengerChange(idx, "age", parseInt(e.target.value) || 0)
+                                  }
+                                  className={`w-full rounded-xl px-3 py-2 text-xs font-bold transition outline-none font-mono border ${
+                                    isLight
+                                      ? "bg-white border-[#76C0EC] text-[#425B9A] focus:border-[#425B9A]"
+                                      : "bg-slate-900 border-slate-800 text-white focus:border-indigo-500"
+                                  }`}
+                                />
+                              </div>
+
+                              {/* Gender */}
+                              <div className="sm:col-span-2">
+                                <label className="block text-[11px] font-bold mb-1 opacity-80">
+                                  Gender
+                                </label>
+                                <select
+                                  value={p.gender}
+                                  onChange={(e) => handlePassengerChange(idx, "gender", e.target.value)}
+                                  className={`w-full rounded-xl px-2.5 py-2 text-xs font-bold transition outline-none cursor-pointer border ${
+                                    isLight
+                                      ? "bg-white border-[#76C0EC] text-[#425B9A]"
+                                      : "bg-slate-900 border-slate-800 text-white"
+                                  }`}
+                                >
+                                  <option value="M">Male</option>
+                                  <option value="F">Female</option>
+                                  <option value="O">Other</option>
+                                </select>
+                              </div>
+
+                              {/* Berth Preference */}
+                              <div className="sm:col-span-3">
+                                <label className="block text-[11px] font-bold mb-1 opacity-80">
+                                  Berth Preference
+                                </label>
+                                <select
+                                  value={p.berth_preference}
+                                  onChange={(e) =>
+                                    handlePassengerChange(idx, "berth_preference", e.target.value)
+                                  }
+                                  className={`w-full rounded-xl px-2.5 py-2 text-xs font-bold transition outline-none cursor-pointer border ${
+                                    isLight
+                                      ? "bg-white border-[#76C0EC] text-[#425B9A]"
+                                      : "bg-slate-900 border-slate-800 text-white"
+                                  }`}
+                                >
+                                  <option value="NO_PREF">No Preference</option>
+                                  <option value="LOWER">Lower Berth (L)</option>
+                                  <option value="MIDDLE">Middle Berth (M)</option>
+                                  <option value="UPPER">Upper Berth (U)</option>
+                                  <option value="SIDE_LOWER">Side Lower (SL)</option>
+                                  <option value="SIDE_UPPER">Side Upper (SU)</option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Summary & Pricing Bar */}
+                    <div
+                      className={`p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 border ${
+                        isLight
+                          ? "bg-[#FFF6DC] border-[#76C0EC]/60"
+                          : "bg-slate-950/80 border-slate-800"
+                      }`}
+                    >
+                      <div className="flex items-center space-x-4">
+                        <div>
+                          <span className="text-[10px] opacity-75 uppercase tracking-wider block font-bold">
+                            Total Fare Summary
+                          </span>
+                          <div className="text-xl font-black text-emerald-600">
+                            ₹{500 * passengers.length}{" "}
+                            <span className="text-xs font-semibold opacity-75 text-inherit">
+                              ({passengers.length} × ₹500 base)
+                            </span>
+                          </div>
+                        </div>
+                        <div className="h-8 w-px bg-slate-700/30 hidden sm:block"></div>
+                        <div className="hidden sm:block">
+                          <span className="text-[10px] opacity-75 uppercase tracking-wider block font-bold">
+                            Queue Policy
+                          </span>
+                          <span className="text-xs font-bold">
+                            {quota === "SS"
+                              ? "Priority 1 (Senior Citizen Min-Heap)"
+                              : quota === "LD"
+                              ? "Priority 2 (Ladies Quota Min-Heap)"
+                              : quota === "TQ"
+                              ? "Tatkal Dynamic Pool"
+                              : "General First-Come First-Served"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={handleHoldBooking}
+                        disabled={loading || !selectedRunId}
+                        className={`w-full sm:w-auto px-7 py-3 rounded-xl font-bold transition text-xs flex items-center justify-center space-x-2 cursor-pointer shadow-lg ${
+                          isLight
+                            ? "bg-[#425B9A] hover:bg-[#334677] text-white shadow-[#425B9A]/20"
+                            : "bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 text-white"
+                        }`}
+                      >
+                        <Lock className="h-3.5 w-3.5" />
+                        <span>Proceed to Seat Hold (5 Min TTL)</span>
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Temporary Hold Modal / Section with Copy PNR */}
+                {holdResult && !bookingConfirmed && (
+                  <div
+                    className={`rounded-2xl p-6 border-2 shadow-2xl space-y-4 ${
+                      isLight
+                        ? "bg-white border-[#425B9A] text-[#425B9A]"
+                        : "bg-slate-900 border-indigo-500 text-white"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between pb-4 border-b border-dashed border-slate-700/30">
+                      <div>
+                        <span className="text-xs uppercase tracking-wider text-amber-500 font-extrabold flex items-center space-x-1.5">
+                          <Clock className="h-4 w-4 animate-spin" />
+                          <span>Seat Hold Active (Status: {holdResult.booking_status})</span>
+                        </span>
+                        <div className="flex items-center space-x-3 mt-1.5">
+                          <h3 className="text-2xl font-mono font-black">
+                            PNR: {holdResult.pnr}
+                          </h3>
+                          <button
+                            onClick={() => copyPnrToClipboard(holdResult.pnr)}
+                            className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center space-x-1 transition cursor-pointer ${
+                              isLight
+                                ? "bg-[#76C0EC]/30 border-[#76C0EC] text-[#425B9A] hover:bg-[#76C0EC]/50"
+                                : "bg-indigo-950 border-indigo-700 text-indigo-300 hover:bg-indigo-900"
+                            }`}
+                            title="Copy PNR to clipboard"
+                          >
+                            {copiedPnr === holdResult.pnr ? (
+                              <>
+                                <Check className="h-3.5 w-3.5 text-emerald-500" />
+                                <span className="text-emerald-500">Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3.5 w-3.5" />
+                                <span>Copy PNR</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-3xl font-mono font-black text-amber-500">
+                          {Math.floor(holdTimeLeft / 60)}:
+                          {(holdTimeLeft % 60).toString().padStart(2, "0")}
+                        </div>
+                        <span className="text-[10px] opacity-75 font-bold uppercase tracking-wider">
+                          Time to Complete Payment
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="py-2 space-y-2">
+                      <h4 className="text-xs font-extrabold uppercase tracking-wide opacity-80">
+                        Held Berths / Waiting Allocations:
+                      </h4>
+                      {holdResult.passengers.map((p: any) => (
+                        <div
+                          key={p.id}
+                          className={`flex items-center justify-between p-3 rounded-xl text-xs font-bold ${
+                            isLight
+                              ? "bg-[#FFF6DC] border border-[#76C0EC]/40"
+                              : "bg-slate-950 border border-slate-800"
+                          }`}
+                        >
+                          <span>{p.name}</span>
                           <span
-                            className={`font-mono font-bold px-2.5 py-1 rounded text-xs ${
+                            className={`font-mono font-black px-2.5 py-1 rounded text-xs ${
+                              p.status === "HELD_CNF"
+                                ? isLight
+                                  ? "bg-emerald-100 text-emerald-700 border border-emerald-300"
+                                  : "bg-emerald-950 text-emerald-400 border border-emerald-800"
+                                : isLight
+                                ? "bg-[#FF95A5]/30 text-[#425B9A] border border-[#FF95A5]"
+                                : "bg-amber-950 text-amber-400 border border-amber-800"
+                            }`}
+                          >
+                            {p.status === "HELD_CNF"
+                              ? `Berth: ${p.coach_code || "S1"}-${p.berth_number} (${p.berth_type})`
+                              : `Waiting List: WL #${p.wl_number || 1}`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Payment Simulator Actions */}
+                    <div className="pt-2 border-t border-dashed border-slate-700/30 flex items-center space-x-3">
+                      <button
+                        onClick={() => handlePayment(true)}
+                        disabled={loading}
+                        className={`flex-1 font-bold py-3 rounded-xl transition text-xs flex items-center justify-center space-x-2 cursor-pointer shadow-lg ${
+                          isLight
+                            ? "bg-[#425B9A] hover:bg-[#334677] text-white"
+                            : "bg-emerald-600 hover:bg-emerald-500 text-white"
+                        }`}
+                      >
+                        <CreditCard className="h-4 w-4" />
+                        <span>Simulate Successful Payment (₹{500 * holdResult.passengers.length})</span>
+                      </button>
+                      <button
+                        onClick={() => handlePayment(false)}
+                        disabled={loading}
+                        className={`px-4 py-3 rounded-xl font-bold transition text-xs cursor-pointer border ${
+                          isLight
+                            ? "bg-rose-100 border-rose-300 text-rose-700 hover:bg-rose-200"
+                            : "bg-rose-950 hover:bg-rose-900 border-rose-800 text-rose-300"
+                        }`}
+                      >
+                        Simulate Failure
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Booking Confirmation Card with Copy PNR */}
+                {bookingConfirmed && (
+                  <div
+                    className={`rounded-2xl p-6 border-2 shadow-2xl space-y-4 ${
+                      isLight
+                        ? "bg-white border-emerald-600 text-[#425B9A]"
+                        : "bg-slate-900 border-emerald-500 text-white"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between pb-3 border-b border-dashed border-slate-700/30">
+                      <div className="flex items-center space-x-3">
+                        <CheckCircle className="h-8 w-8 text-emerald-500" />
+                        <div>
+                          <div className="flex items-center space-x-3">
+                            <h3 className="text-xl font-black">
+                              Booking Finalized! PNR: {bookingConfirmed.pnr}
+                            </h3>
+                            <button
+                              onClick={() => copyPnrToClipboard(bookingConfirmed.pnr)}
+                              className={`px-3 py-1 rounded-xl border text-xs font-bold flex items-center space-x-1 transition cursor-pointer ${
+                                isLight
+                                  ? "bg-[#76C0EC]/30 border-[#76C0EC] text-[#425B9A]"
+                                  : "bg-indigo-950 border-indigo-700 text-indigo-300"
+                              }`}
+                            >
+                              {copiedPnr === bookingConfirmed.pnr ? (
+                                <>
+                                  <Check className="h-3.5 w-3.5 text-emerald-500" />
+                                  <span className="text-emerald-500">Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="h-3.5 w-3.5" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          <p className="text-xs text-emerald-600 font-bold mt-0.5">
+                            Indexed in Custom PNR Hash Table &amp; Probabilistic Bloom Filter
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      {bookingConfirmed.passengers.map((p: any) => (
+                        <div
+                          key={p.id}
+                          className={`p-3 rounded-xl flex items-center justify-between text-xs border ${
+                            isLight
+                              ? "bg-[#FFF6DC] border-[#76C0EC]/40"
+                              : "bg-slate-950 border-slate-800"
+                          }`}
+                        >
+                          <div>
+                            <div className="font-bold">{p.name}</div>
+                            <div className="text-[10px] opacity-75">
+                              Age: {p.age} | Gender: {p.gender}
+                            </div>
+                          </div>
+                          <span
+                            className={`font-mono font-extrabold px-3 py-1 rounded text-xs ${
                               p.status === "CNF"
-                                ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
-                                : "bg-amber-950 text-amber-300 border border-amber-800"
+                                ? "bg-emerald-500/20 text-emerald-600 border border-emerald-500/40"
+                                : "bg-amber-500/20 text-amber-600 border border-amber-500/40"
                             }`}
                           >
                             {p.status === "CNF"
-                              ? `CONFIRMED: ${p.coach_code}-${p.berth_number} (${p.berth_type})`
-                              : `WAITING LIST: WL #${p.wl_number}`}
+                              ? `Confirmed: ${p.coach_code}-${p.berth_number} (${p.berth_type})`
+                              : `Waiting List: WL #${p.wl_number || 1}`}
                           </span>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-
-                  <button
-                    onClick={() => {
-                      setBookingConfirmed(null);
-                      setHoldResult(null);
-                      setPassengers([
-                        { name: "", age: 30, gender: "M", berth_preference: "LOWER" },
-                      ]);
-                    }}
-                    className="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-2 rounded-xl text-xs transition"
-                  >
-                    Book Another Journey
-                  </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -992,16 +1373,28 @@ export default function RailwayApp() {
         {/* ===================== TAB 2: PNR STATUS & LOOKUP ===================== */}
         {activeTab === "pnr" && (
           <div className="max-w-3xl mx-auto space-y-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+            <div
+              className={`rounded-2xl p-6 border shadow-xl space-y-4 transition-all ${
+                isLight
+                  ? "bg-white border-[#76C0EC]/50 text-[#425B9A]"
+                  : "bg-slate-900 border-slate-800 text-white"
+              }`}
+            >
               <div className="flex items-center space-x-3">
-                <div className="p-2.5 bg-indigo-950/80 border border-indigo-800/60 rounded-xl text-indigo-400">
+                <div
+                  className={`p-2.5 rounded-xl border ${
+                    isLight
+                      ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]"
+                      : "bg-indigo-950/80 border-indigo-800/60 text-indigo-400"
+                  }`}
+                >
                   <Search className="h-5 w-5" />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-white tracking-wide">
+                  <h2 className="text-base font-extrabold tracking-wide">
                     Custom PNR Search with Bloom Filter Fast-Rejection
                   </h2>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs opacity-75">
                     Demonstrates the probabilistic Bloom filter O(k) pre-check: if absent, rejects immediately without querying the custom hash table or database.
                   </p>
                 </div>
@@ -1014,12 +1407,16 @@ export default function RailwayApp() {
                     placeholder="Enter 10-digit PNR (e.g. 0342926924)"
                     value={pnrQuery}
                     onChange={(e) => setPnrQuery(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:outline-none font-mono tracking-wider placeholder:tracking-normal placeholder-slate-500 transition"
+                    className={`w-full rounded-xl pl-4 pr-10 py-3 text-sm font-mono tracking-wider transition border outline-none ${
+                      isLight
+                        ? "bg-[#FFF6DC]/40 border-[#76C0EC] text-[#425B9A] focus:border-[#425B9A]"
+                        : "bg-slate-950 border-slate-800 text-white focus:border-indigo-500"
+                    }`}
                   />
                   {pnrQuery && (
                     <button
                       onClick={() => setPnrQuery("")}
-                      className="absolute right-3 top-3 text-slate-500 hover:text-slate-300 text-sm font-bold"
+                      className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 text-sm font-bold"
                     >
                       &times;
                     </button>
@@ -1028,7 +1425,11 @@ export default function RailwayApp() {
                 <button
                   onClick={handlePNRLookup}
                   disabled={loading}
-                  className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-50 text-white font-semibold px-6 py-3 rounded-xl text-sm transition flex items-center justify-center space-x-2 shadow-lg shadow-indigo-600/20 cursor-pointer"
+                  className={`font-extrabold px-6 py-3 rounded-xl text-sm transition flex items-center justify-center space-x-2 cursor-pointer shadow-lg ${
+                    isLight
+                      ? "bg-[#425B9A] hover:bg-[#324578] text-white shadow-[#425B9A]/20"
+                      : "bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 text-white"
+                  }`}
                 >
                   <Search className="h-4 w-4" />
                   <span>Lookup PNR</span>
@@ -1037,11 +1438,11 @@ export default function RailwayApp() {
 
               {/* Quick Preset / Demo PNR Chips */}
               <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
-                <span className="text-slate-500 text-[11px] font-medium flex items-center space-x-1">
-                  <Sparkles className="h-3 w-3 text-indigo-400" />
-                  <span>Try Demo PNRs:</span>
+                <span className="opacity-75 text-[11px] font-bold flex items-center space-x-1">
+                  <Sparkles className="h-3 w-3 text-[#76C0EC]" />
+                  <span>Try Demo PNR:</span>
                 </span>
-                {["0342926924", "4883246767", "9999999999"].map((demoPnr) => (
+                {["9999999999"].map((demoPnr) => (
                   <button
                     key={demoPnr}
                     onClick={() => {
@@ -1058,9 +1459,13 @@ export default function RailwayApp() {
                           notify("error", "Bloom Fast-Rejection", "Non-existent PNR rejected in O(k).");
                         });
                     }}
-                    className="px-2.5 py-1 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-lg text-slate-400 hover:text-indigo-300 font-mono text-[11px] transition"
+                    className={`px-3 py-1 border rounded-lg font-mono text-[11px] font-bold transition cursor-pointer ${
+                      isLight
+                        ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A] hover:bg-[#76C0EC]/20"
+                        : "bg-slate-950 border-slate-800 text-slate-300 hover:text-white"
+                    }`}
                   >
-                    {demoPnr === "9999999999" ? `${demoPnr} (Non-existent)` : demoPnr}
+                    {demoPnr === "9999999999" ? `${demoPnr} (Non-existent PNR Fast Rejection)` : demoPnr}
                   </button>
                 ))}
               </div>
@@ -1068,47 +1473,81 @@ export default function RailwayApp() {
 
             {/* Error or Fast Rejection Result */}
             {pnrError && (
-              <div className="bg-rose-950/40 border border-rose-800/80 rounded-2xl p-5 text-rose-200">
+              <div
+                className={`border rounded-2xl p-5 ${
+                  isLight
+                    ? "bg-rose-50 border-rose-300 text-rose-800"
+                    : "bg-rose-950/40 border-rose-800/80 text-rose-200"
+                }`}
+              >
                 <div className="flex items-center space-x-3 mb-2">
-                  <XCircle className="h-6 w-6 text-rose-400" />
-                  <span className="font-bold text-sm">
+                  <XCircle className="h-6 w-6 text-rose-500" />
+                  <span className="font-extrabold text-sm">
                     {pnrError.message || "PNR Not Found in System"}
                   </span>
                 </div>
                 {pnrError.bloom_filter_pre_check === false && (
-                  <div className="text-xs bg-slate-950/60 p-3 rounded-xl border border-rose-900/60 font-mono">
-                    <span className="text-indigo-400 font-semibold">[Bloom Filter Pre-check]:</span>{" "}
+                  <div
+                    className={`text-xs p-3 rounded-xl border font-mono ${
+                      isLight
+                        ? "bg-white border-rose-200 text-rose-900"
+                        : "bg-slate-950/60 border-rose-900/60 text-slate-200"
+                    }`}
+                  >
+                    <span className="text-indigo-400 font-bold">[Bloom Filter Pre-check]:</span>{" "}
                     Query returned FALSE. Definitively absent from system. Execution bypassed
-                    database lookup.
+                    database lookup in O(k) time.
                   </div>
                 )}
               </div>
             )}
 
-            {/* Success PNR Result */}
+            {/* Success PNR Result with Copy PNR */}
             {pnrResult && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div
+                className={`rounded-2xl p-6 border shadow-xl space-y-4 ${
+                  isLight
+                    ? "bg-white border-[#76C0EC]/50 text-[#425B9A]"
+                    : "bg-slate-900 border-slate-800 text-white"
+                }`}
+              >
+                <div className="flex items-center justify-between pb-3 border-b border-dashed border-slate-700/30">
                   <div>
-                    <span className="text-xs text-slate-400">PNR Inquiry Status</span>
-                    <div className="flex items-center space-x-2.5 mt-0.5">
-                      <h3 className="text-xl font-bold font-mono text-white">{pnrResult.pnr}</h3>
+                    <span className="text-xs opacity-75 font-bold uppercase tracking-wider">
+                      PNR Inquiry Status
+                    </span>
+                    <div className="flex items-center space-x-3 mt-1">
+                      <h3 className="text-2xl font-mono font-black">{pnrResult.pnr}</h3>
                       <button
-                        onClick={() => copyToClipboard(pnrResult.pnr)}
-                        className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
-                        title="Copy PNR"
+                        onClick={() => copyPnrToClipboard(pnrResult.pnr)}
+                        className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center space-x-1.5 transition cursor-pointer ${
+                          isLight
+                            ? "bg-[#76C0EC]/30 border-[#76C0EC] text-[#425B9A]"
+                            : "bg-indigo-950 border-indigo-700 text-indigo-300"
+                        }`}
+                        title="Copy PNR to clipboard"
                       >
-                        <Copy className="h-3.5 w-3.5" />
+                        {copiedPnr === pnrResult.pnr ? (
+                          <>
+                            <Check className="h-3.5 w-3.5 text-emerald-500" />
+                            <span className="text-emerald-500">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5" />
+                            <span>Copy PNR</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   </div>
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    className={`px-3 py-1 rounded-full text-xs font-extrabold ${
                       pnrResult.booking_status === "CONFIRMED"
-                        ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
+                        ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
                         : pnrResult.booking_status === "CANCELLED"
-                        ? "bg-rose-950 text-rose-300 border border-rose-800"
-                        : "bg-amber-950 text-amber-300 border border-amber-800"
+                        ? "bg-rose-100 text-rose-800 border border-rose-300"
+                        : "bg-amber-100 text-amber-800 border border-amber-300"
                     }`}
                   >
                     {pnrResult.booking_status}
@@ -1117,31 +1556,33 @@ export default function RailwayApp() {
 
                 {/* Academic DSA Audit Badge */}
                 {pnrResult.dsa_audit && (
-                  <div className="bg-slate-950 p-3 rounded-xl border border-indigo-950 text-xs space-y-1">
-                    <div className="text-indigo-400 font-semibold flex items-center space-x-1.5">
+                  <div
+                    className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+                      isLight
+                        ? "bg-[#FFF6DC] border-[#76C0EC]/50 text-[#425B9A]"
+                        : "bg-slate-950 border-indigo-950 text-slate-300"
+                    }`}
+                  >
+                    <div className="font-extrabold flex items-center space-x-1.5 text-indigo-500">
                       <ShieldCheck className="h-4 w-4" />
                       <span>DSA Pipeline Verification</span>
                     </div>
-                    <div className="text-slate-400 text-[11px] grid grid-cols-2 gap-2 pt-1 font-mono">
+                    <div className="text-[11px] grid grid-cols-2 gap-2 pt-1 font-mono font-bold">
                       <div>
                         Bloom Pre-Check:{" "}
-                        <span className="text-emerald-400">PASSED (Positive)</span>
+                        <span className="text-emerald-600">PASSED (Positive)</span>
                       </div>
                       <div>
                         Hash Table Lookup:{" "}
-                        <span className="text-emerald-400">O(1) HIT</span>
+                        <span className="text-emerald-600">O(1) HIT</span>
                       </div>
                       <div>
                         Hash Table Load Factor:{" "}
-                        <span className="text-slate-200">
-                          {pnrResult.dsa_audit.hash_table_metrics.load_factor}
-                        </span>
+                        <span>{pnrResult.dsa_audit.hash_table_metrics.load_factor}</span>
                       </div>
                       <div>
                         Bloom FP Rate:{" "}
-                        <span className="text-slate-200">
-                          {pnrResult.dsa_audit.bloom_filter_metrics.theoretical_fp_rate}
-                        </span>
+                        <span>{pnrResult.dsa_audit.bloom_filter_metrics.theoretical_fp_rate}</span>
                       </div>
                     </div>
                   </div>
@@ -1149,20 +1590,26 @@ export default function RailwayApp() {
 
                 {/* Passenger Records */}
                 <div className="space-y-2">
-                  <h4 className="text-xs font-semibold text-slate-300">Passenger Statuses:</h4>
+                  <h4 className="text-xs font-black uppercase tracking-wider opacity-80">
+                    Passenger Statuses:
+                  </h4>
                   {pnrResult.passengers.map((p: any) => (
                     <div
                       key={p.id}
-                      className="bg-slate-950 p-3 rounded-xl border border-slate-800/80 flex items-center justify-between text-xs"
+                      className={`p-3.5 rounded-xl border flex items-center justify-between text-xs ${
+                        isLight
+                          ? "bg-[#FFF6DC]/50 border-[#76C0EC]/40"
+                          : "bg-slate-950 border-slate-800"
+                      }`}
                     >
                       <div>
-                        <div className="font-semibold text-white">{p.name}</div>
-                        <div className="text-[11px] text-slate-400">
+                        <div className="font-black text-sm">{p.name}</div>
+                        <div className="text-[11px] opacity-75 font-semibold">
                           Age: {p.age} | Quota: {pnrResult.quota}
                         </div>
                       </div>
                       <div className="flex items-center space-x-3">
-                        <span className="font-mono font-bold text-indigo-300">
+                        <span className="font-mono font-extrabold text-xs">
                           {p.status === "CNF"
                             ? `${p.coach_code}-${p.berth_number} (${p.berth_type})`
                             : p.status}
@@ -1170,7 +1617,7 @@ export default function RailwayApp() {
                         {p.status !== "CANCELLED" && (
                           <button
                             onClick={() => handleCancelPassenger(pnrResult.pnr, p.id)}
-                            className="text-xs bg-rose-950 hover:bg-rose-900 border border-rose-800 text-rose-300 px-2.5 py-1 rounded-lg transition"
+                            className="text-xs bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1 rounded-lg transition cursor-pointer"
                           >
                             Cancel
                           </button>
@@ -1187,17 +1634,22 @@ export default function RailwayApp() {
         {/* ===================== TAB 3: RESERVATION CHART ===================== */}
         {activeTab === "chart" && (
           <div className="space-y-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex items-center justify-between">
+            <div
+              className={`rounded-2xl p-5 border shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all ${
+                isLight
+                  ? "bg-white border-[#76C0EC]/50 text-[#425B9A]"
+                  : "bg-slate-900 border-slate-800 text-white"
+              }`}
+            >
               <div>
-                <h2 className="text-base font-bold text-white flex items-center space-x-2">
-                  <BarChart3 className="h-5 w-5 text-indigo-400" />
-                  <span>Reservation Chart (Custom Merge-Sort Order)</span>
+                <h2 className="text-lg font-black flex items-center space-x-2">
+                  <BarChart3 className="h-5 w-5 text-[#76C0EC]" />
+                  <span>Reservation Master Chart (Academic Stable Merge-Sort Order)</span>
                 </h2>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs opacity-80 mt-1 font-medium">
                   Sorted strictly by:{" "}
-                  <code className="text-indigo-300">1. Coach Identifier ASC</code> &rarr;{" "}
-                  <code className="text-indigo-300">2. Berth Number ASC</code> using academic Merge
-                  Sort.
+                  <code className="font-extrabold text-[#76C0EC]">1. Coach Identifier ASC</code> &rarr;{" "}
+                  <code className="font-extrabold text-[#76C0EC]">2. Berth Number ASC</code> in deterministic $\Theta(N \log N)$ time.
                 </p>
               </div>
 
@@ -1205,19 +1657,28 @@ export default function RailwayApp() {
                 <select
                   value={chartRunId}
                   onChange={(e) => handleLoadChart(parseInt(e.target.value))}
-                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none"
+                  className={`border rounded-xl px-3.5 py-2 text-xs font-bold focus:outline-none cursor-pointer ${
+                    isLight
+                      ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]"
+                      : "bg-slate-950 border-slate-800 text-white"
+                  }`}
                 >
                   {trains.flatMap((t) =>
                     t.runs.map((r: any) => (
                       <option key={r.run_id} value={r.run_id}>
-                        {t.train_number} - {r.run_date}
+                        {t.train_number} - {t.train_name} ({r.run_date})
                       </option>
                     ))
                   )}
                 </select>
                 <button
                   onClick={() => handleLoadChart(chartRunId)}
-                  className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-300 transition"
+                  className={`p-2 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                    isLight
+                      ? "bg-[#425B9A] text-white border-[#425B9A]"
+                      : "bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700"
+                  }`}
+                  title="Reload Chart"
                 >
                   <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
                 </button>
@@ -1225,65 +1686,131 @@ export default function RailwayApp() {
             </div>
 
             {chartData && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
-                <div className="p-4 bg-slate-950/60 border-b border-slate-800 flex items-center justify-between text-xs font-semibold text-slate-400">
-                  <span>
-                    Train: {chartData.train_name} ({chartData.train_number}) | Run Date:{" "}
+              <div
+                className={`rounded-2xl border shadow-xl overflow-hidden transition-all ${
+                  isLight
+                    ? "bg-white border-[#76C0EC]/50 text-[#425B9A]"
+                    : "bg-slate-900 border-slate-800 text-white"
+                }`}
+              >
+                <div
+                  className={`p-4 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs font-black gap-2 ${
+                    isLight
+                      ? "bg-[#FFF6DC] border-[#76C0EC]/40 text-[#425B9A]"
+                      : "bg-slate-950/70 border-slate-800 text-slate-300"
+                  }`}
+                >
+                  <span className="text-sm tracking-wide">
+                    Train: {chartData.train_name} ({chartData.train_number}) &bull; Run Date:{" "}
                     {chartData.run_date}
                   </span>
-                  <span className="text-indigo-400 font-mono">
+                  <span
+                    className={`font-mono text-xs px-2.5 py-1 rounded-full font-black ${
+                      isLight
+                        ? "bg-[#425B9A] text-white"
+                        : "bg-indigo-950 text-indigo-300 border border-indigo-800"
+                    }`}
+                  >
                     {chartData.sorting_algorithm_used}
                   </span>
                 </div>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-950 text-slate-400 font-semibold border-b border-slate-800 uppercase text-[10px]">
+                    <thead
+                      className={`font-black border-b uppercase text-[11px] tracking-wider ${
+                        isLight
+                          ? "bg-[#425B9A] text-white border-[#76C0EC]/50"
+                          : "bg-slate-950 text-slate-300 border-slate-800"
+                      }`}
+                    >
                       <tr>
-                        <th className="py-3 px-4">Coach</th>
-                        <th className="py-3 px-4">Berth No</th>
-                        <th className="py-3 px-4">Type</th>
-                        <th className="py-3 px-4">Status</th>
-                        <th className="py-3 px-4">Passenger Name</th>
-                        <th className="py-3 px-4">Age / Gender</th>
-                        <th className="py-3 px-4">Quota</th>
+                        <th className="py-3 px-4 font-black">Coach</th>
+                        <th className="py-3 px-4 font-black">Berth No</th>
+                        <th className="py-3 px-4 font-black">Type</th>
+                        <th className="py-3 px-4 font-black">Status</th>
+                        <th className="py-3 px-4 font-black">Passenger Name</th>
+                        <th className="py-3 px-4 font-black">Age / Gender</th>
+                        <th className="py-3 px-4 font-black">Quota</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60">
+                    <tbody
+                      className={`divide-y ${
+                        isLight ? "divide-[#76C0EC]/20" : "divide-slate-800/60"
+                      }`}
+                    >
                       {chartData.sorted_chart.map((row: any, i: number) => (
                         <tr
                           key={i}
-                          className={`hover:bg-slate-800/30 transition ${
-                            row.status === "AVAILABLE" ? "opacity-60" : ""
+                          className={`transition ${
+                            row.status === "AVAILABLE"
+                              ? isLight
+                                ? "hover:bg-[#FFF6DC]/40 opacity-70"
+                                : "hover:bg-slate-800/30 opacity-60"
+                              : isLight
+                              ? "hover:bg-[#76C0EC]/10 font-bold"
+                              : "hover:bg-slate-800/50 font-bold"
                           }`}
                         >
-                          <td className="py-2.5 px-4 font-bold text-indigo-400">
-                            {row.coach_code}
+                          <td className="py-3 px-4">
+                            <span
+                              className={`px-2 py-0.5 rounded font-black text-xs ${
+                                isLight
+                                  ? "bg-[#425B9A] text-white"
+                                  : "bg-indigo-950 text-indigo-300 border border-indigo-800"
+                              }`}
+                            >
+                              {row.coach_code}
+                            </span>
                           </td>
-                          <td className="py-2.5 px-4 font-mono font-semibold">
+                          <td className="py-3 px-4 font-mono font-black text-sm">
                             {row.berth_number}
                           </td>
-                          <td className="py-2.5 px-4 text-slate-400">{row.berth_type}</td>
-                          <td className="py-2.5 px-4">
+                          <td className="py-3 px-4 font-bold text-xs uppercase tracking-wide opacity-80">
+                            {row.berth_type}
+                          </td>
+                          <td className="py-3 px-4">
                             <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${
                                 row.status === "AVAILABLE"
-                                  ? "bg-slate-800 text-slate-400"
+                                  ? isLight
+                                    ? "bg-slate-100 text-slate-600 border border-slate-300"
+                                    : "bg-slate-800 text-slate-400"
                                   : row.status === "HELD"
-                                  ? "bg-amber-950 text-amber-300 border border-amber-800"
+                                  ? isLight
+                                    ? "bg-[#FF95A5]/30 text-[#425B9A] border border-[#FF95A5]"
+                                    : "bg-amber-950 text-amber-300 border border-amber-800"
+                                  : isLight
+                                  ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
                                   : "bg-emerald-950 text-emerald-300 border border-emerald-800"
                               }`}
                             >
                               {row.status}
                             </span>
                           </td>
-                          <td className="py-2.5 px-4 font-medium text-white">
+                          <td className="py-3 px-4 font-black text-sm">
                             {row.passenger_name}
                           </td>
-                          <td className="py-2.5 px-4 text-slate-400">
+                          <td className="py-3 px-4 font-bold text-xs opacity-80">
                             {row.age ? `${row.age} / ${row.gender}` : "-"}
                           </td>
-                          <td className="py-2.5 px-4 text-slate-400">{row.quota || "-"}</td>
+                          <td className="py-3 px-4 font-black text-xs">
+                            {row.quota ? (
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                                  row.quota === "SS"
+                                    ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                    : row.quota === "LD"
+                                    ? "bg-purple-100 text-purple-800 border border-purple-300"
+                                    : "bg-blue-100 text-blue-800 border border-blue-300"
+                                }`}
+                              >
+                                {row.quota}
+                              </span>
+                            ) : (
+                              "-"
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1292,21 +1819,31 @@ export default function RailwayApp() {
 
                 {/* Waiting List Priority Queue Table */}
                 {chartData.waiting_list && chartData.waiting_list.length > 0 && (
-                  <div className="p-5 border-t border-slate-800 bg-slate-950/40">
-                    <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">
-                      Active Waiting List Heap (Priority Ordered)
+                  <div
+                    className={`p-5 border-t ${
+                      isLight
+                        ? "border-[#76C0EC]/30 bg-[#FFF6DC]/40"
+                        : "border-slate-800 bg-slate-950/40"
+                    }`}
+                  >
+                    <h3 className="text-xs font-black uppercase tracking-wider mb-2.5 flex items-center space-x-1.5 text-amber-500">
+                      <span>Active Waiting List Heap (Priority Ordered)</span>
                     </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                       {chartData.waiting_list.map((wl: any, idx: number) => (
                         <div
                           key={idx}
-                          className="bg-slate-900 p-2.5 rounded-lg border border-slate-800 text-xs flex items-center justify-between"
+                          className={`p-3 rounded-xl border text-xs flex items-center justify-between ${
+                            isLight
+                              ? "bg-white border-[#76C0EC]/50 text-[#425B9A]"
+                              : "bg-slate-900 border-slate-800 text-white"
+                          }`}
                         >
                           <div>
-                            <span className="font-bold text-white">Priority #{idx + 1}</span>
-                            <div className="text-[10px] text-slate-400">PNR: {wl.pnr}</div>
+                            <span className="font-black">Priority #{idx + 1}</span>
+                            <div className="text-[11px] font-mono opacity-80">PNR: {wl.pnr}</div>
                           </div>
-                          <span className="bg-amber-950 text-amber-300 border border-amber-800 text-[10px] px-2 py-0.5 rounded font-mono">
+                          <span className="bg-amber-500/20 text-amber-700 border border-amber-500/30 text-[10px] px-2 py-0.5 rounded font-black">
                             {wl.quota} Quota (Age {wl.age})
                           </span>
                         </div>

@@ -171,3 +171,4 @@ This ensures that `pnr1029384756` and `PNR1029384756` hash to the exact same buc
 ### Q15: If the server restarts, does the in-memory DSA state disappear?
 **Model Answer:**  
 "No. Our system uses a **Write-Through Persistence Architecture**. All primary bookings and berth states are permanently stored in the ACID relational database. On server startup, the `startup` event handler executes a **Hydration Routine**: it reads all active bookings from SQLite/PostgreSQL and hydrates them back into the in-memory Bloom Filter, PNR Hash Table, and Quota Priority Min-Heaps in milliseconds."
+

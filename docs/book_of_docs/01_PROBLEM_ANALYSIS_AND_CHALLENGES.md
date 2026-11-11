@@ -80,3 +80,4 @@ During peak intervals—such as the opening of the **Tatkal** quota (short-notic
 | **Chart Generation** | Database sorting | Application-tier Stable Merge Sort ($O(N \log N)$) |
 | **Concurrency Safety** | Global DB locks | Fine-grained Reentrant Locks (`threading.RLock`) |
 | **LAN Distribution** | Manual port forwarding / static IP config | Automated Python LAN launcher with socket detection |
+
