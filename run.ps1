@@ -22,10 +22,11 @@ $BackendProcess = Start-Process python -ArgumentList "-m uvicorn app.main:app --
 
 Start-Sleep -Seconds 2
 
-# Step 3: Start Frontend
+# Step 3: Start Frontend (using cmd.exe /c to properly invoke npm.cmd on Windows)
 Write-Host "[*] Step 3: Starting Next.js Frontend on http://localhost:3000..." -ForegroundColor Green
 Set-Location "$ProjectRoot\frontend"
-$FrontendProcess = Start-Process npm -ArgumentList "run dev -- -p 3000" -PassThru -NoNewWindow
+$FrontendProcess = Start-Process "cmd.exe" -ArgumentList "/c npm run dev -- -p 3000" -PassThru -NoNewWindow
+Set-Location $ProjectRoot
 
 Write-Host ""
 Write-Host "=================================================================" -ForegroundColor Cyan
@@ -37,9 +38,18 @@ Write-Host "=================================================================" -
 Write-Host "Press Ctrl+C to stop both processes."
 
 try {
-    Wait-Process -Id $BackendProcess.Id, $FrontendProcess.Id
+    $watchPids = @()
+    if ($BackendProcess -and $BackendProcess.Id -gt 0) { $watchPids += $BackendProcess.Id }
+    if ($FrontendProcess -and $FrontendProcess.Id -gt 0) { $watchPids += $FrontendProcess.Id }
+    if ($watchPids.Count -gt 0) {
+        Wait-Process -Id $watchPids
+    }
 } finally {
-    Stop-Process -Id $BackendProcess.Id -ErrorAction SilentlyContinue
-    Stop-Process -Id $FrontendProcess.Id -ErrorAction SilentlyContinue
+    Write-Host "`nStopping server processes..." -ForegroundColor Yellow
+    if ($BackendProcess -and $BackendProcess.Id -gt 0) {
+        Stop-Process -Id $BackendProcess.Id -Force -ErrorAction SilentlyContinue
+    }
+    if ($FrontendProcess -and $FrontendProcess.Id -gt 0) {
+        Stop-Process -Id $FrontendProcess.Id -Force -ErrorAction SilentlyContinue
+    }
 }
-
