@@ -1,10 +1,29 @@
-from fastapi import FastAPI
+import os
+import logging
+import traceback
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.database.connection import engine, Base, SessionLocal
 from app.models.entities import Booking
 from app.services.dsa_manager import dsa_manager
 from app.api import trains, bookings, pnr, chart, metrics
+
+# Configure dedicated error logging
+LOGS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "logs"))
+os.makedirs(LOGS_DIR, exist_ok=True)
+ERROR_LOG_PATH = os.path.join(LOGS_DIR, "error.log")
+
+error_file_handler = logging.FileHandler(ERROR_LOG_PATH, encoding="utf-8")
+error_file_handler.setLevel(logging.ERROR)
+error_formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] [%(name)s]: %(message)s")
+error_file_handler.setFormatter(error_formatter)
+
+logger = logging.getLogger("railway_app")
+logger.setLevel(logging.INFO)
+logger.addHandler(error_file_handler)
+logging.getLogger().addHandler(error_file_handler)
 
 # Initialize Database tables
 Base.metadata.create_all(bind=engine)
@@ -14,6 +33,20 @@ app = FastAPI(
     version=settings.VERSION,
     description="Academic Railway Reservation System with Custom Data Structures & Priority Engine"
 )
+
+# Unhandled Exception Logging Middleware
+@app.middleware("http")
+async def log_unhandled_exceptions(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as exc:
+        logger.error(
+            f"Unhandled exception on {request.method} {request.url.path}: {exc}\n{traceback.format_exc()}"
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal Server Error. Details logged to error.log."}
+        )
 
 # Enable CORS for Frontend React integration
 app.add_middleware(

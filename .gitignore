@@ -58,3 +58,8 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
+# Dedicated Error Logs (Explicitly Tracked per User Instruction)
+!logs/error.log
+!error.log
+
+
