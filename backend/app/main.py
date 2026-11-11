@@ -10,12 +10,26 @@ from app.models.entities import Booking
 from app.services.dsa_manager import dsa_manager
 from app.api import trains, bookings, pnr, chart, metrics
 
-# Configure dedicated error logging
+# Configure dedicated error logging with shared file access
 LOGS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "logs"))
 os.makedirs(LOGS_DIR, exist_ok=True)
 ERROR_LOG_PATH = os.path.join(LOGS_DIR, "error.log")
 
-error_file_handler = logging.FileHandler(ERROR_LOG_PATH, encoding="utf-8")
+class SharedFileHandler(logging.Handler):
+    """Logs errors by opening and appending on-demand to avoid exclusive file locks on Windows."""
+    def __init__(self, filename: str):
+        super().__init__()
+        self.filename = filename
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            with open(self.filename, "a", encoding="utf-8") as f:
+                f.write(msg + "\n")
+        except Exception:
+            self.handleError(record)
+
+error_file_handler = SharedFileHandler(ERROR_LOG_PATH)
 error_file_handler.setLevel(logging.ERROR)
 error_formatter = logging.Formatter("[%(asctime)s] [%(levelname)s] [%(name)s]: %(message)s")
 error_file_handler.setFormatter(error_formatter)

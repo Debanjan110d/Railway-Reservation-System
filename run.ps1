@@ -22,7 +22,9 @@ function Log-ErrorMsg {
     $entry = "[$ts] [ERROR] [Launcher]: $Message"
     Write-Host $entry -ForegroundColor Red
     if (-not $NoLog) {
-        $entry | Out-File -Append -FilePath $ErrorLog -Encoding utf8
+        try {
+            $entry | Out-File -Append -FilePath $ErrorLog -Encoding utf8
+        } catch {}
     }
 }
 
@@ -31,7 +33,9 @@ function Log-InfoMsg {
     $ts = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
     $entry = "[$ts] [INFO] [Launcher]: $Message"
     if (-not $NoLog) {
-        $entry | Out-File -Append -FilePath $ErrorLog -Encoding utf8
+        try {
+            $entry | Out-File -Append -FilePath $ErrorLog -Encoding utf8
+        } catch {}
     }
 }
 
