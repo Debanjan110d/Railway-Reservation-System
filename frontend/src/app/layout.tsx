@@ -4,6 +4,13 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "RailDSA Engine | Railway Reservation & Priority Allocation",
   description: "Academic Railway Reservation System with Custom DSA & Waiting-List Prioritization",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" }
+    ],
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

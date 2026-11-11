@@ -25,6 +25,12 @@ import {
   ShieldCheck,
   ChevronRight,
   XCircle,
+  Trash2,
+  Copy,
+  Check,
+  Info,
+  Sparkles,
+  UserPlus,
 } from "lucide-react";
 
 export default function RailwayApp() {
@@ -32,6 +38,26 @@ export default function RailwayApp() {
   const [trains, setTrains] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Floating Toast Notifications System
+  const [toasts, setToasts] = useState<
+    Array<{ id: string; type: "success" | "error" | "warning" | "info"; title: string; message: string }>
+  >([]);
+
+  const notify = (type: "success" | "error" | "warning" | "info", title: string, message: string) => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts((prev) => [...prev, { id, type, title, message }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4500);
+  };
+
+  const copyToClipboard = (text: string, label: string = "PNR") => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      notify("info", `${label} Copied!`, `${text} has been copied to your clipboard.`);
+    }
+  };
 
   // Booking Flow States
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
@@ -163,7 +189,9 @@ export default function RailwayApp() {
     if (!selectedRunId) return;
     for (const p of passengers) {
       if (!p.name.trim()) {
-        setError("Please enter names for all passengers.");
+        const msg = "Please enter names for all passengers.";
+        setError(msg);
+        notify("warning", "Missing Passenger Info", msg);
         return;
       }
     }
@@ -179,8 +207,14 @@ export default function RailwayApp() {
       setHoldTimeLeft(300);
       loadDSAMetrics();
       if (selectedRunId) loadLayout(selectedRunId);
+      notify(
+        "success",
+        "Temporary Seat Hold Active",
+        `PNR ${res.pnr} held (${res.booking_status}). 5-minute payment countdown started.`
+      );
     } catch (err: any) {
       setError(err.message);
+      notify("error", "Seat Hold Failed", err.message || "Failed to hold berths.");
     } finally {
       setLoading(false);
     }
@@ -200,24 +234,51 @@ export default function RailwayApp() {
       setHoldResult(null);
       loadDSAMetrics();
       if (selectedRunId) loadLayout(selectedRunId);
+      if (success) {
+        notify(
+          "success",
+          "Booking Confirmed!",
+          `PNR ${res.pnr} is confirmed and indexed into the Custom PNR Hash Table & Bloom Filter.`
+        );
+      } else {
+        notify(
+          "warning",
+          "Payment Simulation Failed",
+          "Held berths have been released back to the train availability pool."
+        );
+      }
     } catch (err: any) {
       setError(err.message);
       setHoldResult(null);
+      notify("error", "Payment Error", err.message || "Payment confirmation failed.");
     } finally {
       setLoading(false);
     }
   };
 
   const handlePNRLookup = async () => {
-    if (!pnrQuery.trim()) return;
+    if (!pnrQuery.trim()) {
+      notify("warning", "PNR Required", "Please enter a valid 10-digit PNR number.");
+      return;
+    }
     setPnrError(null);
     setPnrResult(null);
     setLoading(true);
     try {
       const data = await lookupPNR(pnrQuery.trim());
       setPnrResult(data);
+      notify(
+        "success",
+        "PNR Record Located",
+        `PNR ${data.pnr} verified via Bloom filter pre-check and O(1) Hash Table lookup.`
+      );
     } catch (err: any) {
       setPnrError(err.detail || { message: "Failed to locate PNR." });
+      notify(
+        "error",
+        "PNR Not Found",
+        err.detail?.message || "Bloom Filter fast-rejection: PNR does not exist in system."
+      );
     } finally {
       setLoading(false);
     }
@@ -230,8 +291,14 @@ export default function RailwayApp() {
       handlePNRLookup();
       loadDSAMetrics();
       if (selectedRunId) loadLayout(selectedRunId);
+      notify(
+        "info",
+        "Cancellation Processed",
+        "Berth released. Waiting list priority heap automatically evaluated for promotion."
+      );
     } catch (err: any) {
       setError(err.message);
+      notify("error", "Cancellation Failed", err.message || "Failed to cancel booking.");
     } finally {
       setLoading(false);
     }
@@ -508,81 +575,112 @@ export default function RailwayApp() {
 
               {/* Passenger Booking Entry & Hold Status */}
               {!holdResult && !bookingConfirmed && (
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-slate-300 flex items-center space-x-2">
-                      <Users className="h-4 w-4 text-indigo-400" />
-                      <span>Passenger Details ({passengers.length} of 4)</span>
-                    </h3>
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <div className="flex items-center space-x-2.5">
+                      <div className="p-2 bg-indigo-950/80 border border-indigo-800/60 rounded-xl text-indigo-400">
+                        <Users className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-white tracking-wide">Passenger Details</h3>
+                        <p className="text-[11px] text-slate-400">Specify passenger details and preferred berths (Max 4)</p>
+                      </div>
+                    </div>
                     <button
                       onClick={handleAddPassenger}
                       disabled={passengers.length >= 4}
-                      className="px-3 py-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-xs font-medium rounded-lg text-indigo-300 transition"
+                      className="px-3.5 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/50 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold rounded-xl text-indigo-300 transition flex items-center space-x-1.5 shadow-sm"
                     >
-                      + Add Passenger
+                      <UserPlus className="h-3.5 w-3.5" />
+                      <span>Add Passenger ({passengers.length}/4)</span>
                     </button>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-3.5">
                     {passengers.map((p, idx) => (
                       <div
                         key={idx}
-                        className="p-3 bg-slate-950/40 border border-slate-800 rounded-xl grid grid-cols-1 sm:grid-cols-12 gap-3 items-center"
+                        className="p-4 bg-slate-950/60 border border-slate-800 hover:border-slate-700/80 rounded-2xl transition space-y-3"
                       >
-                        <div className="sm:col-span-5">
-                          <input
-                            type="text"
-                            placeholder="Passenger Name"
-                            value={p.name}
-                            onChange={(e) => handlePassengerChange(idx, "name", e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <input
-                            type="number"
-                            placeholder="Age"
-                            value={p.age}
-                            onChange={(e) =>
-                              handlePassengerChange(idx, "age", parseInt(e.target.value) || 0)
-                            }
-                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <select
-                            value={p.gender}
-                            onChange={(e) => handlePassengerChange(idx, "gender", e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
-                          >
-                            <option value="M">Male</option>
-                            <option value="F">Female</option>
-                            <option value="O">Other</option>
-                          </select>
-                        </div>
-                        <div className="sm:col-span-2">
-                          <select
-                            value={p.berth_preference}
-                            onChange={(e) =>
-                              handlePassengerChange(idx, "berth_preference", e.target.value)
-                            }
-                            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-500"
-                          >
-                            <option value="LOWER">Lower</option>
-                            <option value="MIDDLE">Middle</option>
-                            <option value="UPPER">Upper</option>
-                            <option value="SIDE_LOWER">Side Lower</option>
-                          </select>
-                        </div>
-                        <div className="sm:col-span-1 text-right">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-indigo-300 flex items-center space-x-2">
+                            <span className="w-5 h-5 rounded-full bg-indigo-950 border border-indigo-700/80 flex items-center justify-center text-[10px] font-bold text-indigo-300">
+                              {idx + 1}
+                            </span>
+                            <span>Passenger #{idx + 1}</span>
+                          </span>
                           {passengers.length > 1 && (
                             <button
                               onClick={() => handleRemovePassenger(idx)}
-                              className="text-slate-500 hover:text-rose-400 text-sm font-bold"
+                              className="text-slate-500 hover:text-rose-400 p-1 rounded-lg hover:bg-rose-950/30 transition text-xs flex items-center space-x-1"
+                              title="Remove passenger"
                             >
-                              &times;
+                              <Trash2 className="h-3.5 w-3.5" />
+                              <span className="text-[11px]">Remove</span>
                             </button>
                           )}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                          <div className="sm:col-span-5">
+                            <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                              Full Name (as per Govt ID)
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g. Rahul Sharma"
+                              value={p.name}
+                              onChange={(e) => handlePassengerChange(idx, "name", e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 transition outline-none"
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                              Age
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={120}
+                              placeholder="Age"
+                              value={p.age}
+                              onChange={(e) =>
+                                handlePassengerChange(idx, "age", parseInt(e.target.value) || 0)
+                              }
+                              className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-3 py-2 text-xs text-white transition outline-none"
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                              Gender
+                            </label>
+                            <select
+                              value={p.gender}
+                              onChange={(e) => handlePassengerChange(idx, "gender", e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-2.5 py-2 text-xs text-white transition outline-none cursor-pointer"
+                            >
+                              <option value="M">Male</option>
+                              <option value="F">Female</option>
+                              <option value="O">Other</option>
+                            </select>
+                          </div>
+                          <div className="sm:col-span-3">
+                            <label className="block text-[11px] font-medium text-slate-400 mb-1">
+                              Berth Preference
+                            </label>
+                            <select
+                              value={p.berth_preference}
+                              onChange={(e) =>
+                                handlePassengerChange(idx, "berth_preference", e.target.value)
+                              }
+                              className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-2.5 py-2 text-xs text-white transition outline-none cursor-pointer"
+                            >
+                              <option value="LOWER">Lower Berth</option>
+                              <option value="MIDDLE">Middle Berth</option>
+                              <option value="UPPER">Upper Berth</option>
+                              <option value="SIDE_LOWER">Side Lower</option>
+                            </select>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -591,7 +689,7 @@ export default function RailwayApp() {
                   <button
                     onClick={handleHoldBooking}
                     disabled={loading}
-                    className="w-full mt-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl shadow-lg shadow-indigo-600/30 transition text-sm flex items-center justify-center space-x-2"
+                    className="w-full mt-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl shadow-lg shadow-indigo-600/20 transition text-sm flex items-center justify-center space-x-2 cursor-pointer"
                   >
                     <span>Request Temporary Berth Hold (5 Min TTL)</span>
                     <ChevronRight className="h-4 w-4" />
@@ -732,31 +830,77 @@ export default function RailwayApp() {
         {/* ===================== TAB 2: PNR STATUS & LOOKUP ===================== */}
         {activeTab === "pnr" && (
           <div className="max-w-3xl mx-auto space-y-6">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-              <h2 className="text-base font-bold text-white mb-2 flex items-center space-x-2">
-                <Search className="h-5 w-5 text-indigo-400" />
-                <span>Custom PNR Search with Bloom Filter Fast-Rejection</span>
-              </h2>
-              <p className="text-xs text-slate-400 mb-4">
-                Demonstrates the probabilistic Bloom filter \(O(k)\) pre-check: if absent,
-                it rejects immediately without querying the custom hash table or database.
-              </p>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 bg-indigo-950/80 border border-indigo-800/60 rounded-xl text-indigo-400">
+                  <Search className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white tracking-wide">
+                    Custom PNR Search with Bloom Filter Fast-Rejection
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Demonstrates the probabilistic Bloom filter O(k) pre-check: if absent, rejects immediately without querying the custom hash table or database.
+                  </p>
+                </div>
+              </div>
 
-              <div className="flex space-x-2">
-                <input
-                  type="text"
-                  placeholder="Enter 10-digit PNR (e.g. 0582918231)"
-                  value={pnrQuery}
-                  onChange={(e) => setPnrQuery(e.target.value)}
-                  className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"
-                />
+              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    placeholder="Enter 10-digit PNR (e.g. 0342926924)"
+                    value={pnrQuery}
+                    onChange={(e) => setPnrQuery(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:outline-none font-mono tracking-wider placeholder:tracking-normal placeholder-slate-500 transition"
+                  />
+                  {pnrQuery && (
+                    <button
+                      onClick={() => setPnrQuery("")}
+                      className="absolute right-3 top-3 text-slate-500 hover:text-slate-300 text-sm font-bold"
+                    >
+                      &times;
+                    </button>
+                  )}
+                </div>
                 <button
                   onClick={handlePNRLookup}
                   disabled={loading}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition"
+                  className="bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-50 text-white font-semibold px-6 py-3 rounded-xl text-sm transition flex items-center justify-center space-x-2 shadow-lg shadow-indigo-600/20 cursor-pointer"
                 >
-                  Lookup PNR
+                  <Search className="h-4 w-4" />
+                  <span>Lookup PNR</span>
                 </button>
+              </div>
+
+              {/* Quick Preset / Demo PNR Chips */}
+              <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                <span className="text-slate-500 text-[11px] font-medium flex items-center space-x-1">
+                  <Sparkles className="h-3 w-3 text-indigo-400" />
+                  <span>Try Demo PNRs:</span>
+                </span>
+                {["0342926924", "4883246767", "9999999999"].map((demoPnr) => (
+                  <button
+                    key={demoPnr}
+                    onClick={() => {
+                      setPnrQuery(demoPnr);
+                      lookupPNR(demoPnr)
+                        .then((data) => {
+                          setPnrResult(data);
+                          setPnrError(null);
+                          notify("success", "PNR Located", `Demo PNR ${demoPnr} verified.`);
+                        })
+                        .catch((err) => {
+                          setPnrError(err.detail || { message: "PNR Not Found" });
+                          setPnrResult(null);
+                          notify("error", "Bloom Fast-Rejection", "Non-existent PNR rejected in O(k).");
+                        });
+                    }}
+                    className="px-2.5 py-1 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-lg text-slate-400 hover:text-indigo-300 font-mono text-[11px] transition"
+                  >
+                    {demoPnr === "9999999999" ? `${demoPnr} (Non-existent)` : demoPnr}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -785,7 +929,16 @@ export default function RailwayApp() {
                 <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                   <div>
                     <span className="text-xs text-slate-400">PNR Inquiry Status</span>
-                    <h3 className="text-xl font-bold font-mono text-white">{pnrResult.pnr}</h3>
+                    <div className="flex items-center space-x-2.5 mt-0.5">
+                      <h3 className="text-xl font-bold font-mono text-white">{pnrResult.pnr}</h3>
+                      <button
+                        onClick={() => copyToClipboard(pnrResult.pnr)}
+                        className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
+                        title="Copy PNR"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-bold ${
@@ -1144,6 +1297,41 @@ export default function RailwayApp() {
           </div>
         )}
       </main>
+
+      {/* Floating Modern Toast Stack */}
+      <div className="fixed top-5 right-5 z-[999] flex flex-col space-y-2.5 pointer-events-none max-w-sm w-full">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`pointer-events-auto rounded-2xl p-4 shadow-2xl backdrop-blur-xl border flex items-start space-x-3 transition-all transform duration-300 ${
+              t.type === "success"
+                ? "bg-slate-900/95 border-emerald-500/80 text-emerald-200 shadow-emerald-950/50"
+                : t.type === "error"
+                ? "bg-slate-900/95 border-rose-500/80 text-rose-200 shadow-rose-950/50"
+                : t.type === "warning"
+                ? "bg-slate-900/95 border-amber-500/80 text-amber-200 shadow-amber-950/50"
+                : "bg-slate-900/95 border-indigo-500/80 text-indigo-200 shadow-indigo-950/50"
+            }`}
+          >
+            <div className="mt-0.5 flex-shrink-0">
+              {t.type === "success" && <CheckCircle className="h-5 w-5 text-emerald-400" />}
+              {t.type === "error" && <AlertTriangle className="h-5 w-5 text-rose-400" />}
+              {t.type === "warning" && <Clock className="h-5 w-5 text-amber-400" />}
+              {t.type === "info" && <Info className="h-5 w-5 text-indigo-400" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4 className="text-xs font-bold text-white tracking-wide">{t.title}</h4>
+              <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">{t.message}</p>
+            </div>
+            <button
+              onClick={() => setToasts((prev) => prev.filter((item) => item.id !== t.id))}
+              className="text-slate-400 hover:text-white text-xs font-bold p-1 rounded-lg hover:bg-slate-800 transition"
+            >
+              &times;
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

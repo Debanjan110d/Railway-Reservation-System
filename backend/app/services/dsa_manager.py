@@ -31,5 +31,11 @@ class DSAManager:
             self.train_rac_queues[train_run_id] = WaitingQueue()
         return self.train_rac_queues[train_run_id]
 
+    def reset(self):
+        self.pnr_table = PNRHashTable(initial_capacity=128)
+        self.bloom_filter = BloomFilter(expected_elements=10000, false_positive_rate=0.01)
+        self.train_waiting_heaps = {}
+        self.train_rac_queues = {}
+
 dsa_manager = DSAManager()
 
