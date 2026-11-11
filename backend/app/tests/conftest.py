@@ -6,3 +6,4 @@ def reset_dsa_structures():
     dsa_manager.reset()
     yield
     dsa_manager.reset()
+

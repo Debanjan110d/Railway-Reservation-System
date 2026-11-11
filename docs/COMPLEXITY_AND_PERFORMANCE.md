@@ -121,3 +121,4 @@ The academic simulation harness (`backend/app/tests/simulation_runner.py`) was e
 | **6. Core DSA Data Structures** | `app/tests/test_dsa.py` | 5 Unit Tests | **PASS (100%)** |
 | **7. Reservation Flow Lifecycle** | `app/tests/test_reservation_flow.py` | 2 Lifecycle Tests | **PASS (100%)** |
 | **Total Automated Tests** | **16 Tests** | **16 Passed, 0 Failed** | **100% Success** |
+
