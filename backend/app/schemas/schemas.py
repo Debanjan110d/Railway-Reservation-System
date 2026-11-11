@@ -3,10 +3,30 @@ from typing import List, Optional
 import datetime
 
 class PassengerCreate(BaseModel):
-    name: str
-    age: int
+    name: Optional[str] = None
+    first_name: Optional[str] = None
+    middle_name: Optional[str] = None
+    last_name: Optional[str] = None
+    age: int = Field(..., ge=1, le=125, description="Realistic human age between 1 and 125")
     gender: str
     berth_preference: Optional[str] = "NO_PREFERENCE"  # LOWER, MIDDLE, UPPER, SIDE_LOWER, SIDE_UPPER
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def populate_name(cls, v: Optional[str], values) -> Optional[str]:
+        return str(v).strip() if v else v
+
+    @field_validator("age")
+    @classmethod
+    def validate_age_range(cls, v: int) -> int:
+        if v < 1 or v > 125:
+            raise ValueError("Passenger age must be a realistic human age between 1 and 125 years.")
+        return v
+
+    def model_post_init(self, __context) -> None:
+        if not self.name:
+            parts = [p.strip() for p in [self.first_name, self.middle_name, self.last_name] if p and p.strip()]
+            self.name = " ".join(parts) if parts else "Passenger"
 
     @field_validator("gender", mode="before")
     @classmethod

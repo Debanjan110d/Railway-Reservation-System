@@ -41,6 +41,8 @@ import {
   MapPin,
   Calendar,
   Ticket,
+  X,
+  SearchX,
 } from "lucide-react";
 
 export default function RailwayApp() {
@@ -53,7 +55,8 @@ export default function RailwayApp() {
   const [theme, setTheme] = useState<"dark" | "light">("light");
   const isLight = theme === "light";
 
-  // Dominant Route & Station Filtering
+  // Train Search & Route Filtering
+  const [searchQuery, setSearchQuery] = useState("");
   const [searchFrom, setSearchFrom] = useState("ALL");
   const [searchTo, setSearchTo] = useState("ALL");
   const [copiedPnr, setCopiedPnr] = useState<string | null>(null);
@@ -92,12 +95,65 @@ export default function RailwayApp() {
   const [selectedTrain, setSelectedTrain] = useState<any>(null);
   const [coachLayout, setCoachLayout] = useState<any>(null);
   const [quota, setQuota] = useState("GN");
-  const [passengers, setPassengers] = useState([
-    { name: "", age: 30, gender: "M", berth_preference: "LOWER" },
+  const [passengers, setPassengers] = useState<
+    Array<{
+      first_name: string;
+      middle_name: string;
+      last_name: string;
+      age: number | "";
+      gender: string;
+      berth_preference: string;
+    }>
+  >([
+    { first_name: "", middle_name: "", last_name: "", age: 30, gender: "M", berth_preference: "LOWER" },
   ]);
   const [holdResult, setHoldResult] = useState<any>(null);
   const [holdTimeLeft, setHoldTimeLeft] = useState<number>(300);
   const [bookingConfirmed, setBookingConfirmed] = useState<any>(null);
+
+  // Dynamic Route Stations and Filtered Trains
+  const sourceStations = React.useMemo(() => {
+    const set = new Set<string>();
+    trains.forEach((t) => {
+      if (t.source_station) set.add(t.source_station);
+    });
+    return Array.from(set).sort();
+  }, [trains]);
+
+  const destinationStations = React.useMemo(() => {
+    const set = new Set<string>();
+    trains.forEach((t) => {
+      if (t.destination_station) set.add(t.destination_station);
+    });
+    return Array.from(set).sort();
+  }, [trains]);
+
+  const filteredTrains = React.useMemo(() => {
+    return trains.filter((t) => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const numMatch = t.train_number?.toLowerCase().includes(q);
+        const nameMatch = t.train_name?.toLowerCase().includes(q);
+        const srcMatch = t.source_station?.toLowerCase().includes(q);
+        const dstMatch = t.destination_station?.toLowerCase().includes(q);
+        if (!numMatch && !nameMatch && !srcMatch && !dstMatch) return false;
+      }
+      if (searchFrom !== "ALL" && !t.source_station?.toLowerCase().includes(searchFrom.toLowerCase())) {
+        return false;
+      }
+      if (searchTo !== "ALL" && !t.destination_station?.toLowerCase().includes(searchTo.toLowerCase())) {
+        return false;
+      }
+      return true;
+    });
+  }, [trains, searchQuery, searchFrom, searchTo]);
+
+  const handleSwapStations = () => {
+    const prevFrom = searchFrom;
+    const prevTo = searchTo;
+    setSearchFrom(prevTo);
+    setSearchTo(prevFrom);
+  };
 
   // PNR Search State
   const [pnrQuery, setPnrQuery] = useState("");
@@ -209,7 +265,10 @@ export default function RailwayApp() {
 
   const handleAddPassenger = () => {
     if (passengers.length >= 4) return;
-    setPassengers([...passengers, { name: "", age: 28, gender: "M", berth_preference: "LOWER" }]);
+    setPassengers([
+      ...passengers,
+      { first_name: "", middle_name: "", last_name: "", age: 28, gender: "M", berth_preference: "LOWER" },
+    ]);
   };
 
   const handleRemovePassenger = (idx: number) => {
@@ -219,27 +278,76 @@ export default function RailwayApp() {
 
   const handlePassengerChange = (index: number, field: string, value: any) => {
     const updated = [...passengers];
-    updated[index] = { ...updated[index], [field]: value };
+    if (field === "age") {
+      if (value === "" || value === null || value === undefined) {
+        updated[index] = { ...updated[index], age: "" };
+      } else {
+        const parsed = parseInt(String(value), 10);
+        if (isNaN(parsed)) {
+          updated[index] = { ...updated[index], age: "" };
+        } else {
+          // Real-world human age boundary: 1 to 120
+          const clamped = Math.max(1, Math.min(120, parsed));
+          updated[index] = { ...updated[index], age: clamped };
+        }
+      }
+    } else {
+      updated[index] = { ...updated[index], [field]: value };
+    }
     setPassengers(updated);
   };
 
   const handleHoldBooking = async () => {
-    if (!selectedRunId) return;
-    for (const p of passengers) {
-      if (!p.name.trim()) {
-        const msg = "Please enter names for all passengers.";
+    if (!selectedRunId) {
+      const msg = "Please select a train and scheduled date first.";
+      setError(msg);
+      notify("warning", "No Schedule Selected", msg);
+      return;
+    }
+    for (let i = 0; i < passengers.length; i++) {
+      const p = passengers[i];
+      if (!p.first_name.trim()) {
+        const msg = `Please enter First Name for Passenger #${i + 1}.`;
         setError(msg);
-        notify("warning", "Missing Passenger Info", msg);
+        notify("warning", "Missing Name", msg);
+        return;
+      }
+      if (!p.last_name.trim()) {
+        const msg = `Please enter Last Name for Passenger #${i + 1}.`;
+        setError(msg);
+        notify("warning", "Missing Name", msg);
+        return;
+      }
+      const ageNum = Number(p.age);
+      if (p.age === "" || isNaN(ageNum) || ageNum < 1 || ageNum > 120) {
+        const msg = `Passenger #${i + 1}: Age must be a real-world human age between 1 and 120 years.`;
+        setError(msg);
+        notify("warning", "Invalid Age", msg);
         return;
       }
     }
     setError(null);
     setLoading(true);
     try {
+      const formattedPassengers = passengers.map((p) => {
+        const fullName = [p.first_name.trim(), p.middle_name.trim(), p.last_name.trim()]
+          .filter(Boolean)
+          .join(" ");
+        return {
+          name: fullName,
+          first_name: p.first_name.trim(),
+          middle_name: p.middle_name.trim(),
+          last_name: p.last_name.trim(),
+          age: Number(p.age),
+          gender: p.gender,
+          berth_preference: p.berth_preference,
+        };
+      });
+
       const res = await createBookingHold({
         train_run_id: selectedRunId,
         quota,
-        passengers,
+        passengers: formattedPassengers,
       });
       setHoldResult(res);
       setHoldTimeLeft(300);
@@ -618,8 +726,33 @@ export default function RailwayApp() {
                   </p>
                 </div>
 
-                {/* Route Selector Controls */}
-                <div className="flex flex-wrap items-center gap-2.5">
+                {/* Route & Search Controls */}
+                <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+                  {/* Real-time Train Search Input */}
+                  <div className="relative min-w-[200px] flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#76C0EC]" />
+                    <input
+                      type="text"
+                      placeholder="Search train (e.g. 12301, Rajdhani, Puri)..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className={`w-full pl-9 pr-7 py-2 text-xs font-semibold rounded-xl border outline-none transition ${
+                        isLight
+                          ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A] placeholder-[#425B9A]/60 focus:ring-2 focus:ring-[#76C0EC]"
+                          : "bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus:border-indigo-500"
+                      }`}
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold opacity-60 hover:opacity-100 p-0.5 cursor-pointer"
+                        title="Clear search"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+
                   <div className="flex items-center space-x-1.5">
                     <span className="text-xs font-bold">From:</span>
                     <select
@@ -631,18 +764,17 @@ export default function RailwayApp() {
                           : "bg-slate-950 border-slate-800 text-white"
                       }`}
                     >
-                      <option value="ALL">All Bengal Hubs</option>
-                      <option value="Howrah (HWH)">Howrah (HWH)</option>
-                      <option value="Sealdah (SDAH)">Sealdah (SDAH)</option>
+                      <option value="ALL">All Origins</option>
+                      {sourceStations.map((stn) => (
+                        <option key={stn} value={stn}>
+                          {stn}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
                   <button
-                    onClick={() => {
-                      const prevFrom = searchFrom;
-                      setSearchFrom(searchTo === "ALL" ? "Howrah (HWH)" : searchTo);
-                      setSearchTo(prevFrom === "ALL" ? "ALL" : prevFrom);
-                    }}
+                    onClick={handleSwapStations}
                     className={`p-2 rounded-xl border transition cursor-pointer ${
                       isLight
                         ? "bg-[#76C0EC]/20 border-[#76C0EC] hover:bg-[#76C0EC]/40 text-[#425B9A]"
@@ -665,12 +797,32 @@ export default function RailwayApp() {
                       }`}
                     >
                       <option value="ALL">All Destinations</option>
-                      <option value="New Delhi (NDLS)">New Delhi (NDLS)</option>
-                      <option value="New Jalpaiguri (NJP)">New Jalpaiguri (NJP)</option>
-                      <option value="Puri (PURI)">Puri (PURI)</option>
-                      <option value="Ranchi (RNC)">Ranchi (RNC)</option>
+                      {destinationStations.map((stn) => (
+                        <option key={stn} value={stn}>
+                          {stn}
+                        </option>
+                      ))}
                     </select>
                   </div>
+
+                  {(searchQuery || searchFrom !== "ALL" || searchTo !== "ALL") && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setSearchFrom("ALL");
+                        setSearchTo("ALL");
+                      }}
+                      className={`px-2.5 py-2 rounded-xl border text-xs font-bold flex items-center space-x-1 transition cursor-pointer ${
+                        isLight
+                          ? "bg-[#FF95A5]/20 text-[#425B9A] border-[#FF95A5] hover:bg-[#FF95A5]/30"
+                          : "bg-rose-950/40 text-rose-300 border-rose-800 hover:bg-rose-900/40"
+                      }`}
+                      title="Clear all filters"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      <span>Reset</span>
+                    </button>
+                  )}
 
                   <button
                     onClick={loadTrains}
@@ -736,23 +888,100 @@ export default function RailwayApp() {
                       <Train className="h-4 w-4 text-[#76C0EC]" />
                       <span>Select Train &amp; Schedule</span>
                     </h2>
-                    <span className="text-xs font-semibold opacity-75">
-                      {trains.filter((t) => {
-                        if (searchFrom !== "ALL" && !t.source_station.toLowerCase().includes(searchFrom.toLowerCase())) return false;
-                        if (searchTo !== "ALL" && !t.destination_station.toLowerCase().includes(searchTo.toLowerCase())) return false;
-                        return true;
-                      }).length} Trains Available
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#76C0EC]/20 text-[#425B9A]">
+                      {filteredTrains.length} / {trains.length} Trains
                     </span>
                   </div>
 
-                  <div className="space-y-3">
-                    {trains
-                      .filter((t) => {
-                        if (searchFrom !== "ALL" && !t.source_station.toLowerCase().includes(searchFrom.toLowerCase())) return false;
-                        if (searchTo !== "ALL" && !t.destination_station.toLowerCase().includes(searchTo.toLowerCase())) return false;
-                        return true;
-                      })
-                      .map((t) => {
+                  {/* Quick Category Filters */}
+                  <div className="flex flex-wrap gap-1.5 mb-3.5 pb-2.5 border-b border-dashed border-slate-700/20">
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                        setSearchFrom("ALL");
+                        setSearchTo("ALL");
+                      }}
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition cursor-pointer ${
+                        !searchQuery && searchFrom === "ALL" && searchTo === "ALL"
+                          ? isLight
+                            ? "bg-[#425B9A] text-white border-[#425B9A]"
+                            : "bg-indigo-600 text-white border-indigo-500"
+                          : isLight
+                          ? "bg-[#FFF6DC] text-[#425B9A] border-[#76C0EC]/40 hover:bg-[#76C0EC]/20"
+                          : "bg-slate-950 text-slate-400 border-slate-800 hover:text-white"
+                      }`}
+                    >
+                      All ({trains.length})
+                    </button>
+                    {["Rajdhani", "Vande Bharat", "Shatabdi", "Puri"].map((tag) => (
+                      <button
+                        key={tag}
+                        onClick={() => setSearchQuery(tag)}
+                        className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition cursor-pointer ${
+                          searchQuery.toLowerCase() === tag.toLowerCase()
+                            ? isLight
+                              ? "bg-[#425B9A] text-white border-[#425B9A]"
+                              : "bg-indigo-600 text-white border-indigo-500"
+                            : isLight
+                            ? "bg-[#FFF6DC] text-[#425B9A] border-[#76C0EC]/40 hover:bg-[#76C0EC]/20"
+                            : "bg-slate-950 text-slate-400 border-slate-800 hover:text-white"
+                        }`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Empty Filter State or Filtered Train Cards */}
+                  {filteredTrains.length === 0 ? (
+                    <div
+                      className={`p-6 rounded-2xl border text-center space-y-3 ${
+                        isLight
+                          ? "bg-[#FFF6DC]/50 border-[#76C0EC]/60 text-[#425B9A]"
+                          : "bg-slate-950 border-slate-800 text-slate-300"
+                      }`}
+                    >
+                      <div className="w-12 h-12 rounded-full mx-auto flex items-center justify-center bg-[#76C0EC]/20 text-[#425B9A]">
+                        <SearchX className="h-6 w-6 text-[#425B9A]" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-extrabold">No Trains Match Filter</h3>
+                        <p className="text-xs opacity-75 mt-1">
+                          {searchQuery
+                            ? `No trains found matching "${searchQuery}".`
+                            : `No trains operate directly between ${searchFrom} and ${searchTo}.`}
+                        </p>
+                      </div>
+                      <div className="pt-2 flex flex-wrap justify-center gap-2">
+                        <button
+                          onClick={() => {
+                            setSearchQuery("");
+                            setSearchFrom("ALL");
+                            setSearchTo("ALL");
+                          }}
+                          className={`px-4 py-2 rounded-xl text-xs font-black border transition cursor-pointer ${
+                            isLight
+                              ? "bg-[#425B9A] text-white hover:bg-[#34487b] border-[#425B9A]"
+                              : "bg-indigo-600 text-white hover:bg-indigo-500 border-indigo-500"
+                          }`}
+                        >
+                          Show All Trains ({trains.length})
+                        </button>
+                        <button
+                          onClick={loadTrains}
+                          className={`px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                            isLight
+                              ? "bg-white border-[#76C0EC] text-[#425B9A] hover:bg-[#76C0EC]/20"
+                              : "bg-slate-900 border-slate-700 text-slate-300 hover:text-white"
+                          }`}
+                        >
+                          Reload Fleet
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredTrains.map((t) => {
                         const isSelectedTrain = selectedTrain?.id === t.id;
                         return (
                           <div
@@ -831,7 +1060,8 @@ export default function RailwayApp() {
                           </div>
                         );
                       })}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -981,7 +1211,11 @@ export default function RailwayApp() {
                     {/* Passenger Cards */}
                     <div className="space-y-3.5">
                       {passengers.map((p, idx) => {
-                        const isSenior = p.age >= 60;
+                        const ageNum = typeof p.age === "number" ? p.age : parseInt(String(p.age), 10) || 0;
+                        const isSenior = ageNum >= 60 && ageNum <= 120;
+                        const isChild = ageNum >= 5 && ageNum < 12;
+                        const isInfant = ageNum >= 1 && ageNum < 5;
+
                         return (
                           <div
                             key={idx}
@@ -1003,11 +1237,21 @@ export default function RailwayApp() {
                                   {idx + 1}
                                 </span>
                                 <span className="text-xs font-extrabold">
-                                  {idx === 0 ? "Primary Passenger (Adult 12+ yrs)" : `Passenger #${idx + 1}`}
+                                  {idx === 0 ? "Primary Passenger" : `Passenger #${idx + 1}`}
                                 </span>
                                 {isSenior && (
                                   <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/20 text-emerald-600 border border-emerald-500/40 flex items-center space-x-1">
-                                    <span>✓ Senior Citizen (SS Priority Applied)</span>
+                                    <span>🧓 Senior Citizen (SS Quota Priority)</span>
+                                  </span>
+                                )}
+                                {isChild && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-black bg-sky-500/20 text-sky-600 border border-sky-500/40">
+                                    🧒 Child (5-11 yrs)
+                                  </span>
+                                )}
+                                {isInfant && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-600 border border-amber-500/40">
+                                    🍼 Infant (Lap / Under 5)
                                   </span>
                                 )}
                                 {p.gender === "F" && quota === "LD" && (
@@ -1028,17 +1272,18 @@ export default function RailwayApp() {
                               )}
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 pt-1">
-                              {/* Full Name */}
-                              <div className="sm:col-span-5">
+                            {/* Row 1: Name Breakdown (First, Middle, Last) */}
+                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 pt-1">
+                              {/* First Name */}
+                              <div className="sm:col-span-4">
                                 <label className="block text-[11px] font-bold mb-1 opacity-80">
-                                  Full Name (As per Govt ID Card)
+                                  First Name <span className="text-rose-500">*</span>
                                 </label>
                                 <input
                                   type="text"
-                                  placeholder="e.g. Sourav Ganguly"
-                                  value={p.name}
-                                  onChange={(e) => handlePassengerChange(idx, "name", e.target.value)}
+                                  placeholder="e.g. Sourav"
+                                  value={p.first_name}
+                                  onChange={(e) => handlePassengerChange(idx, "first_name", e.target.value)}
                                   className={`w-full rounded-xl px-3 py-2 text-xs font-semibold transition outline-none border ${
                                     isLight
                                       ? "bg-white border-[#76C0EC] text-[#425B9A] focus:border-[#425B9A]"
@@ -1047,20 +1292,60 @@ export default function RailwayApp() {
                                 />
                               </div>
 
-                              {/* Age */}
-                              <div className="sm:col-span-2">
+                              {/* Middle Name */}
+                              <div className="sm:col-span-4">
                                 <label className="block text-[11px] font-bold mb-1 opacity-80">
-                                  Age (Yrs)
+                                  Middle Name <span className="text-[10px] font-normal opacity-70">(Optional)</span>
                                 </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Chandidas"
+                                  value={p.middle_name}
+                                  onChange={(e) => handlePassengerChange(idx, "middle_name", e.target.value)}
+                                  className={`w-full rounded-xl px-3 py-2 text-xs font-semibold transition outline-none border ${
+                                    isLight
+                                      ? "bg-white border-[#76C0EC] text-[#425B9A] focus:border-[#425B9A]"
+                                      : "bg-slate-900 border-slate-800 text-white focus:border-indigo-500"
+                                  }`}
+                                />
+                              </div>
+
+                              {/* Last Name */}
+                              <div className="sm:col-span-4">
+                                <label className="block text-[11px] font-bold mb-1 opacity-80">
+                                  Last Name <span className="text-rose-500">*</span>
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Ganguly"
+                                  value={p.last_name}
+                                  onChange={(e) => handlePassengerChange(idx, "last_name", e.target.value)}
+                                  className={`w-full rounded-xl px-3 py-2 text-xs font-semibold transition outline-none border ${
+                                    isLight
+                                      ? "bg-white border-[#76C0EC] text-[#425B9A] focus:border-[#425B9A]"
+                                      : "bg-slate-900 border-slate-800 text-white focus:border-indigo-500"
+                                  }`}
+                                />
+                              </div>
+                            </div>
+
+                            {/* Row 2: Age, Gender, Berth Preference */}
+                            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                              {/* Age with Real-World Human Limit */}
+                              <div className="sm:col-span-3">
+                                <div className="flex items-center justify-between mb-1">
+                                  <label className="text-[11px] font-bold opacity-80">
+                                    Age <span className="text-[10px] font-normal opacity-70">(1-120 yrs)</span> <span className="text-rose-500">*</span>
+                                  </label>
+                                </div>
                                 <input
                                   type="number"
                                   min={1}
                                   max={120}
-                                  placeholder="30"
+                                  step={1}
+                                  placeholder="e.g. 30"
                                   value={p.age}
-                                  onChange={(e) =>
-                                    handlePassengerChange(idx, "age", parseInt(e.target.value) || 0)
-                                  }
+                                  onChange={(e) => handlePassengerChange(idx, "age", e.target.value)}
                                   className={`w-full rounded-xl px-3 py-2 text-xs font-bold transition outline-none font-mono border ${
                                     isLight
                                       ? "bg-white border-[#76C0EC] text-[#425B9A] focus:border-[#425B9A]"
@@ -1070,7 +1355,7 @@ export default function RailwayApp() {
                               </div>
 
                               {/* Gender */}
-                              <div className="sm:col-span-2">
+                              <div className="sm:col-span-3">
                                 <label className="block text-[11px] font-bold mb-1 opacity-80">
                                   Gender
                                 </label>
@@ -1083,14 +1368,14 @@ export default function RailwayApp() {
                                       : "bg-slate-900 border-slate-800 text-white"
                                   }`}
                                 >
-                                  <option value="M">Male</option>
-                                  <option value="F">Female</option>
-                                  <option value="O">Other</option>
+                                  <option value="M">Male (M)</option>
+                                  <option value="F">Female (F)</option>
+                                  <option value="O">Other (Transgender)</option>
                                 </select>
                               </div>
 
                               {/* Berth Preference */}
-                              <div className="sm:col-span-3">
+                              <div className="sm:col-span-6">
                                 <label className="block text-[11px] font-bold mb-1 opacity-80">
                                   Berth Preference
                                 </label>
@@ -1105,10 +1390,10 @@ export default function RailwayApp() {
                                       : "bg-slate-900 border-slate-800 text-white"
                                   }`}
                                 >
-                                  <option value="NO_PREF">No Preference</option>
-                                  <option value="LOWER">Lower Berth (L)</option>
-                                  <option value="MIDDLE">Middle Berth (M)</option>
-                                  <option value="UPPER">Upper Berth (U)</option>
+                                  <option value="NO_PREF">No Preference (System Optimal)</option>
+                                  <option value="LOWER">Lower Berth (Senior Preferred)</option>
+                                  <option value="MIDDLE">Middle Berth</option>
+                                  <option value="UPPER">Upper Berth</option>
                                   <option value="SIDE_LOWER">Side Lower (SL)</option>
                                   <option value="SIDE_UPPER">Side Upper (SU)</option>
                                 </select>
