@@ -58,13 +58,14 @@ python serve_lan.py
 
 ## 4. Academic College Project "Book of Documentation"
 
-A comprehensive 5-chapter academic textbook detailing real-world engineering challenges, custom algorithmic formulations, mathematical proofs, and examiner viva voce prep is stored in [`docs/book_of_docs/`](docs/book_of_docs/README.md):
+A comprehensive 6-chapter academic textbook detailing real-world engineering challenges, custom algorithmic formulations, mathematical proofs, quota specifications, and examiner viva voce prep is stored in [`docs/book_of_docs/`](docs/book_of_docs/README.md):
 
 - [**Chapter 1: Problem Analysis & Real-World Challenges**](docs/book_of_docs/01_PROBLEM_ANALYSIS_AND_CHALLENGES.md) — The *Tatkal* concurrency bottleneck, double-booking race condition, waitlist priority inversion, and SQL lock contention.
 - [**Chapter 2: Custom DSA Formulations & Mathematical Solutions**](docs/book_of_docs/02_CUSTOM_DSA_SOLUTIONS.md) — Polynomial Rolling Hash Table, Kirsch-Mitzenmacher Bloom Filter ($m=95{,}850, k=6$), 4-Tuple Quota Min-Heap, Doubly-Linked Circular RAC Queue, and Stable Merge Sort.
 - [**Chapter 3: Concurrency, Parallel Processing & Normalization**](docs/book_of_docs/03_CONCURRENCY_AND_PARALLEL_PROCESSING.md) — Multi-threaded safety with `threading.RLock`, 2-phase seat holds with 5-minute TTL locks, idempotency tokens, and boundary casing/whitespace normalization.
 - [**Chapter 4: Local Area Network (LAN) & Cross-Device Engineering**](docs/book_of_docs/04_LAN_DEPLOYMENT_AND_CROSS_DEVICE_NETWORKING.md) — Dynamic socket discovery, resolving the mobile loopback trap, and multi-device live testing.
 - [**Chapter 5: Empirical Benchmark Results & College Viva Voce Guide**](docs/book_of_docs/05_EXPERIMENTAL_RESULTS_AND_VIVA_PREP.md) — Mathematical complexity matrix, 1,200-event empirical benchmark logs, and 15 commonly asked professor/examiner viva questions with model answers.
+- [**Chapter 6: Reservation Quota Specification & Financial Rules**](docs/book_of_docs/06_RESERVATION_QUOTA_SPECIFICATION_AND_FINANCIAL_RULES.md) — Technical allocation, demographic backend validation (SS age $\ge 60$, LD female only), lower-berth prioritization, statutory Tatkal surcharge calculation, and max 100-year age limit.
 
 ---
 

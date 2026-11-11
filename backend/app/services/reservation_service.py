@@ -14,17 +14,89 @@ class ReservationService:
         # 10-digit Indian Railway format PNR
         return f"{uuid.uuid4().int % 10000000000:010d}"
 
+    CLASS_BASE_FARES = {
+        "2S": 120.0,
+        "SL": 250.0,
+        "CC": 600.0,
+        "3AC": 850.0,
+        "2AC": 1200.0,
+        "EC": 1800.0,
+    }
+
+    TATKAL_RULES = {
+        "2S": {"rate": 0.10, "min": 10.0, "max": 15.0},
+        "SL": {"rate": 0.10, "min": 100.0, "max": 200.0},
+        "CC": {"rate": 0.30, "min": 125.0, "max": 225.0},
+        "3AC": {"rate": 0.30, "min": 300.0, "max": 400.0},
+        "2AC": {"rate": 0.30, "min": 400.0, "max": 500.0},
+        "EC": {"rate": 0.30, "min": 400.0, "max": 500.0},
+    }
+
+    @classmethod
+    def calculate_fare_breakdown(cls, coach_type: str, quota: str, num_passengers: int = 1) -> Dict[str, Any]:
+        c_type = coach_type.upper() if coach_type else "2AC"
+        base_per_pax = cls.CLASS_BASE_FARES.get(c_type, 500.0)
+        tatkal_per_pax = 0.0
+
+        if quota.upper() == "TQ":
+            rules = cls.TATKAL_RULES.get(c_type, {"rate": 0.30, "min": 100.0, "max": 500.0})
+            raw_charge = base_per_pax * rules["rate"]
+            tatkal_per_pax = min(rules["max"], max(rules["min"], raw_charge))
+
+        per_pax_total = base_per_pax + tatkal_per_pax
+        total_fare = per_pax_total * num_passengers
+
+        return {
+            "coach_type": c_type,
+            "quota": quota.upper(),
+            "base_fare": base_per_pax,
+            "tatkal_charge": tatkal_per_pax,
+            "per_passenger_fare": per_pax_total,
+            "total_passengers": num_passengers,
+            "total_fare": total_fare,
+            "currency": "INR"
+        }
+
+    @classmethod
+    def validate_quota_eligibility(cls, quota: str, passengers: List[PassengerCreate]):
+        quota = quota.upper()
+        if quota == "SS":
+            # Senior Citizen: Men >= 60, Women >= 58
+            for p in passengers:
+                gender = (p.gender or "M").strip().upper()
+                min_age = 58 if gender in ["F", "FEMALE"] else 60
+                if p.age < min_age:
+                    raise ValueError(
+                        f"Passenger '{p.name or 'Passenger'}' (age {p.age}) does not qualify for Senior Citizen (SS) Quota. Minimum age is {min_age}."
+                    )
+        elif quota == "LD":
+            # Ladies Quota: All adult passengers must be female, or accompanied children <= 12
+            for p in passengers:
+                gender = (p.gender or "").strip().upper()
+                if gender not in ["F", "FEMALE"] and p.age > 12:
+                    raise ValueError(
+                        f"Passenger '{p.name or 'Passenger'}' is not eligible for Ladies Quota (LD). Must be female or accompanied child <= 12 years."
+                    )
+        elif quota == "TQ":
+            # Tatkal Quota: Valid booking window
+            pass
+        elif quota == "GN":
+            # General: No special age or gender restrictions
+            pass
+        else:
+            raise ValueError(f"Unknown quota '{quota}'. Supported quotas are: GN, SS, LD, TQ.")
+
     @classmethod
     def create_booking_hold(cls, db: Session, req: BookingCreate) -> Dict[str, Any]:
         """
         Creates a temporary reservation hold (AVAILABLE -> HELD).
-        Enforces:
-        1. Atomic row-level claim of berths (or sequential hold in SQLite).
-        2. Hold expiration TTL (default 5 minutes).
-        3. If berths are exhausted, allocate RAC or Waiting-List.
+        Validates quota eligibility and allocates physical berths or waitlist.
         """
         # Expire any old holds first
         cls.cleanup_expired_holds(db)
+
+        # Validate quota eligibility before holding seats
+        cls.validate_quota_eligibility(req.quota, req.passengers)
 
         # 1. Fetch available berths for this train run
         # Join berths with coach to ensure valid train_run
@@ -45,7 +117,6 @@ class ReservationService:
         num_passengers = len(req.passengers)
         
         # Decide category: Confirmed, RAC, or Waiting
-        # In a standard coach, side lowers can be RAC (up to 4 per train run for demo)
         booking_status = "HELD" if len(available_berths) >= num_passengers else "HELD_WL"
 
         new_booking = Booking(
@@ -61,14 +132,21 @@ class ReservationService:
         db.add(new_booking)
         db.flush()
 
+        # Prioritize lower berths for Senior Citizen (SS) quota
+        if req.quota.upper() == "SS":
+            lower_berths = [b for b in available_berths if b.berth_type == "LOWER"]
+            other_berths = [b for b in available_berths if b.berth_type != "LOWER"]
+            allocated_pool = lower_berths + other_berths
+        else:
+            allocated_pool = list(available_berths)
+
         passenger_records = []
         pq = dsa_manager.get_priority_queue(req.train_run_id)
-        rac_q = dsa_manager.get_rac_queue(req.train_run_id)
 
         for i, p_info in enumerate(req.passengers):
-            if i < len(available_berths):
-                # We have a physical berth available
-                berth = available_berths[i]
+            if i < len(allocated_pool):
+                # Physical berth allocated
+                berth = allocated_pool[i]
                 berth.current_status = "HELD"
                 berth.active_booking_id = new_booking.id
 
@@ -82,7 +160,7 @@ class ReservationService:
                     status="HELD_CNF"
                 )
             else:
-                # Quota & Waiting-List allocation
+                # Waiting-List allocation
                 p_record = Passenger(
                     booking_id=new_booking.id,
                     name=p_info.name,
@@ -158,7 +236,7 @@ class ReservationService:
                     berth.current_status = "CONFIRMED"
             else:
                 p.status = "WL"
-                # Add to academic priority queue
+                # Add to priority queue
                 pq_entry = PriorityQueueEntry(
                     passenger_id=p.id,
                     pnr=pnr,
@@ -170,10 +248,19 @@ class ReservationService:
                 pq.push(pq_entry)
                 p.wl_number = len(pq)
 
+        # Determine coach class for fare calculation
+        coach_type = "2AC"
+        for p in booking.passengers:
+            if p.allocated_berth and p.allocated_berth.coach:
+                coach_type = p.allocated_berth.coach.coach_type
+                break
+
+        fare = cls.calculate_fare_breakdown(coach_type, booking.quota, len(booking.passengers))
+
         # Record payment
         payment = Payment(
             booking_id=booking.id,
-            amount=500.0 * len(booking.passengers),
+            amount=fare["total_fare"],
             status="SUCCESS"
         )
         db.add(payment)
@@ -193,12 +280,10 @@ class ReservationService:
     @classmethod
     def cancel_reservation(cls, db: Session, pnr: str, passenger_id: Optional[int] = None) -> Dict[str, Any]:
         """
-        Cancels a booking or specific passenger and executes AUTOMATIC PROMOTION.
-        Academic Requirement 3.6:
+        Cancels a booking or specific passenger and promotes next waitlisted passenger.
         1. Release associated berth.
-        2. Identify highest-priority eligible passenger from PriorityQueue.
+        2. Identify highest-priority eligible passenger from priority queue.
         3. Allocate berth to promoted passenger.
-        4. Maintain application state and persistent consistency.
         """
         booking = db.query(Booking).filter(Booking.pnr == pnr).first()
         if not booking:
@@ -323,6 +408,14 @@ class ReservationService:
                 "wl_number": p.wl_number
             })
 
+        coach_type = "2AC"
+        for p in passengers:
+            if p.allocated_berth and p.allocated_berth.coach:
+                coach_type = p.allocated_berth.coach.coach_type
+                break
+
+        fare = ReservationService.calculate_fare_breakdown(coach_type, booking.quota, len(passengers))
+
         return {
             "pnr": booking.pnr,
             "train_run_id": booking.train_run_id,
@@ -331,6 +424,7 @@ class ReservationService:
             "total_passengers": len(passengers),
             "held_until": str(booking.held_until) if booking.held_until else None,
             "created_at": str(booking.created_at),
+            "fare_breakdown": fare,
             "passengers": p_res
         }
 

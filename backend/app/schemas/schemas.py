@@ -7,7 +7,7 @@ class PassengerCreate(BaseModel):
     first_name: Optional[str] = None
     middle_name: Optional[str] = None
     last_name: Optional[str] = None
-    age: int = Field(..., ge=1, le=125, description="Realistic human age between 1 and 125")
+    age: int = Field(..., ge=1, le=100, description="Age between 1 and 100")
     gender: str
     berth_preference: Optional[str] = "NO_PREFERENCE"  # LOWER, MIDDLE, UPPER, SIDE_LOWER, SIDE_UPPER
 
@@ -19,8 +19,8 @@ class PassengerCreate(BaseModel):
     @field_validator("age")
     @classmethod
     def validate_age_range(cls, v: int) -> int:
-        if v < 1 or v > 125:
-            raise ValueError("Passenger age must be a realistic human age between 1 and 125 years.")
+        if v < 1 or v > 100:
+            raise ValueError("Passenger age must be between 1 and 100 years.")
         return v
 
     def model_post_init(self, __context) -> None:
@@ -90,6 +90,7 @@ class BookingResponse(BaseModel):
     total_passengers: int
     held_until: Optional[datetime.datetime] = None
     created_at: datetime.datetime
+    fare_breakdown: Optional[dict] = None
     passengers: List[PassengerResponse]
 
 class CoachConfig(BaseModel):

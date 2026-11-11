@@ -330,8 +330,8 @@ export default function RailwayApp() {
         if (isNaN(parsed)) {
           updated[index] = { ...updated[index], age: "" };
         } else {
-          // Real-world human age boundary: 1 to 120
-          const clamped = Math.max(1, Math.min(120, parsed));
+          // Highest age limit: 1 to 100
+          const clamped = Math.max(1, Math.min(100, parsed));
           updated[index] = { ...updated[index], age: clamped };
         }
       }
@@ -363,11 +363,29 @@ export default function RailwayApp() {
         return;
       }
       const ageNum = Number(p.age);
-      if (p.age === "" || isNaN(ageNum) || ageNum < 1 || ageNum > 120) {
-        const msg = `Passenger #${i + 1}: Age must be a real-world human age between 1 and 120 years.`;
+      if (p.age === "" || isNaN(ageNum) || ageNum < 1 || ageNum > 100) {
+        const msg = `Passenger #${i + 1}: Age must be between 1 and 100 years.`;
         setError(msg);
         notify("warning", "Invalid Age", msg);
         return;
+      }
+
+      // Quota eligibility validation
+      if (quota === "SS") {
+        const minAge = p.gender === "F" ? 58 : 60;
+        if (ageNum < minAge) {
+          const msg = `Passenger #${i + 1} (${p.first_name}): Senior Citizen (SS) Quota requires age >= ${minAge} (${p.gender === "F" ? "Women 58+" : "Men 60+"}).`;
+          setError(msg);
+          notify("warning", "Quota Ineligible", msg);
+          return;
+        }
+      } else if (quota === "LD") {
+        if (p.gender !== "F" && ageNum > 12) {
+          const msg = `Passenger #${i + 1} (${p.first_name}): Ladies Quota (LD) permits female passengers or accompanied children under 12 years only.`;
+          setError(msg);
+          notify("warning", "Quota Ineligible", msg);
+          return;
+        }
       }
     }
     setError(null);
@@ -554,6 +572,44 @@ export default function RailwayApp() {
     const currentRun = selectedTrain.runs.find((r: any) => r.run_id === selectedRunId);
     return currentRun?.available_berths || 0;
   }, [selectedTrain, selectedRunId]);
+
+  // Dynamic fare calculation per IRCTC rules
+  const fareBreakdown = useMemo(() => {
+    const classFares: Record<string, number> = {
+      "2S": 120,
+      "SL": 250,
+      "CC": 600,
+      "3AC": 850,
+      "2AC": 1200,
+      "EC": 1800,
+    };
+    const tatkalRules: Record<string, { rate: number; min: number; max: number }> = {
+      "2S": { rate: 0.1, min: 10, max: 15 },
+      "SL": { rate: 0.1, min: 100, max: 200 },
+      "CC": { rate: 0.3, min: 125, max: 225 },
+      "3AC": { rate: 0.3, min: 300, max: 400 },
+      "2AC": { rate: 0.3, min: 400, max: 500 },
+      "EC": { rate: 0.3, min: 400, max: 500 },
+    };
+
+    const cType = selectedClass !== "ALL" ? selectedClass : (coachLayout?.coaches?.[0]?.coach_type || "2AC");
+    const baseFare = classFares[cType] || 500;
+    let tatkalSurcharge = 0;
+    if (quota === "TQ") {
+      const rule = tatkalRules[cType] || { rate: 0.3, min: 100, max: 500 };
+      const raw = baseFare * rule.rate;
+      tatkalSurcharge = Math.min(rule.max, Math.max(rule.min, raw));
+    }
+    const perPax = baseFare + tatkalSurcharge;
+    const count = passengers.length || 1;
+    return {
+      cType,
+      baseFare,
+      tatkalSurcharge,
+      perPax,
+      total: perPax * count,
+    };
+  }, [selectedClass, coachLayout, quota, passengers.length]);
 
   return (
     <div
@@ -1208,6 +1264,20 @@ export default function RailwayApp() {
                           </button>
                         ))}
                       </div>
+
+                      {/* Quota Rules Helper Banner */}
+                      <div
+                        className={`mt-2.5 px-3 py-1.5 rounded-xl text-[11px] font-semibold border ${
+                          isLight
+                            ? "bg-[#FFF6DC]/70 border-[#76C0EC]/40 text-[#425B9A]"
+                            : "bg-[#222831]/80 border-[#948979]/30 text-[#DFD0B8]"
+                        }`}
+                      >
+                        {quota === "GN" && "General (GN): Standard First-Come-First-Served inventory allocation. Base fare."}
+                        {quota === "SS" && "Senior Citizen (SS): Valid for men 60+ / women 58+. Prioritizes lower berths & Priority 1 Min-Heap promotion."}
+                        {quota === "LD" && "Ladies Quota (LD): Female passengers or accompanied children under 12. Priority 2 Min-Heap promotion."}
+                        {quota === "TQ" && "Tatkal Quota (TQ): Short-notice reservation with statutory Tatkal surcharge calculated on backend."}
+                      </div>
                     </div>
 
                     {/* Select Class Strip */}
@@ -1509,12 +1579,12 @@ export default function RailwayApp() {
                             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
                               <div className="sm:col-span-3">
                                 <label className="block text-[11px] font-bold mb-1 opacity-80">
-                                  Age <span className="text-[10px] font-normal opacity-70">(1-120 yrs)</span> <span className="text-rose-500">*</span>
+                                  Age <span className="text-[10px] font-normal opacity-70">(1-100 yrs)</span> <span className="text-rose-500">*</span>
                                 </label>
                                 <input
                                   type="number"
                                   min={1}
-                                  max={120}
+                                  max={100}
                                   step={1}
                                   placeholder="30"
                                   value={p.age}
@@ -1584,14 +1654,19 @@ export default function RailwayApp() {
                       <div className="flex items-center space-x-4">
                         <div>
                           <span className="text-[10px] opacity-75 uppercase tracking-wider block font-bold">
-                            Fare Summary
+                            Fare Summary ({fareBreakdown.cType})
                           </span>
                           <div className="text-xl font-black text-emerald-400">
-                            ₹{500 * passengers.length}{" "}
+                            ₹{fareBreakdown.total}{" "}
                             <span className="text-xs font-semibold opacity-75 text-inherit">
-                              ({passengers.length} × ₹500)
+                              ({passengers.length} × ₹{fareBreakdown.perPax})
                             </span>
                           </div>
+                          {quota === "TQ" && (
+                            <div className="text-[10px] text-amber-400 font-bold">
+                              Includes Tatkal charge: ₹{fareBreakdown.tatkalSurcharge}/pax
+                            </div>
+                          )}
                         </div>
                         <div className="h-8 w-px bg-slate-700/30 hidden sm:block"></div>
                         <div className="hidden sm:block">

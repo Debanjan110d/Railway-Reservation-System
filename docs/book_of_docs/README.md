@@ -25,6 +25,7 @@ This **Book of Documentation** details the exact real-world engineering problems
 | **Ch. 3** | [**03. Concurrency, Parallel Processing & Normalization**](03_CONCURRENCY_AND_PARALLEL_PROCESSING.md) | Reentrant Thread Locking (`threading.RLock`), 2-Phase Seat Hold with 5-minute TTL, Idempotency Tokens, Casing/Whitespace normalization, Deadlock-free invariants. |
 | **Ch. 4** | [**04. Local Area Network (LAN) & Cross-Device Engineering**](04_LAN_DEPLOYMENT_AND_CROSS_DEVICE_NETWORKING.md) | Cross-device routing, dynamic LAN IP socket auto-detection, `NEXT_PUBLIC_API_URL` client-side hydration fix, CORS and firewall configuration. |
 | **Ch. 5** | [**05. Empirical Benchmark Results & Viva Voce Guide**](05_EXPERIMENTAL_RESULTS_AND_VIVA_PREP.md) | Asymptotic complexity proofs ($O(1)$, $O(\log N)$), 1,200-event stress test benchmarks, and 15 rigorous Examiner/Professor Viva Q&A with answers. |
+| **Ch. 6** | [**06. Reservation Quotas & Financial Rules**](06_RESERVATION_QUOTA_SPECIFICATION_AND_FINANCIAL_RULES.md) | GN, SS, LD, and TQ technical allocation, backend demographic validation, statutory Tatkal surcharge formula, and max 100-year age limit. |
 
 ---
 
@@ -73,7 +74,7 @@ flowchart TD
 ## Academic Attribution & Verification
 
 - **Language & Runtime:** Python 3.11+ / Node.js 20+
-- **Unit & Integration Suite:** 18 automated pytest test cases (`backend/app/tests/`)
+- **Unit & Integration Suite:** 22 automated pytest test cases (`backend/app/tests/`)
 - **Frontend Engine:** Next.js 16 with Turbopack compilation ($<700\text{ms}$)
 - **Mathematical Formulations:** Polynomial Rolling Hash, FNV-1a, Kirsch-Mitzenmacher Bloom optimization, Binary Heap Sifting, Stable Divide-and-Conquer Merge.
 
