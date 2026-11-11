@@ -43,9 +43,7 @@ import {
   Ticket,
   X,
   SearchX,
-  SlidersHorizontal,
   Layers,
-  ArrowUpDown,
 } from "lucide-react";
 
 export default function RailwayApp() {
@@ -54,7 +52,7 @@ export default function RailwayApp() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Theme: Dark Palette (#091540, #1B2CC1, #7692FF, #ABD2FA) & Light Palette (#FFF6DC, #425B9A, #76C0EC, #FF95A5)
+  // Theme: Dark Palette (#222831, #393E46, #948979, #DFD0B8) & Light Palette (#FFF6DC, #425B9A, #76C0EC, #FF95A5)
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const isLight = theme === "light";
 
@@ -118,6 +116,11 @@ export default function RailwayApp() {
   // Chart State
   const [chartRunId, setChartRunId] = useState<number>(1);
   const [chartData, setChartData] = useState<any>(null);
+  const [loadingChart, setLoadingChart] = useState<boolean>(false);
+  const [chartSearchQuery, setChartSearchQuery] = useState<string>("");
+
+  // Today reference string (YYYY-MM-DD) to exclude past dates
+  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
 
   // DSA Metrics State
   const [dsaMetrics, setDsaMetrics] = useState<any>(null);
@@ -149,15 +152,16 @@ export default function RailwayApp() {
     return Array.from(set).sort();
   }, [trains]);
 
+  // Current & upcoming run dates (excludes past dates)
   const allRunDates = useMemo(() => {
     const set = new Set<string>();
     trains.forEach((t) => {
       t.runs?.forEach((r: any) => {
-        if (r.run_date) set.add(r.run_date);
+        if (r.run_date && r.run_date >= todayStr) set.add(r.run_date);
       });
     });
     return Array.from(set).sort();
-  }, [trains]);
+  }, [trains, todayStr]);
 
   // Filtered & Sorted Trains List
   const filteredTrains = useMemo(() => {
@@ -216,9 +220,10 @@ export default function RailwayApp() {
       const data = await fetchTrains();
       setTrains(data);
       if (data.length > 0 && data[0].runs.length > 0) {
-        setSelectedRunId(data[0].runs[0].run_id);
+        const validRun = data[0].runs.find((r: any) => !r.run_date || r.run_date >= todayStr) || data[0].runs[0];
+        setSelectedRunId(validRun.run_id);
         setSelectedTrain(data[0]);
-        loadLayout(data[0].runs[0].run_id);
+        loadLayout(validRun.run_id);
       }
     } catch (err: any) {
       setError(err.message || "Failed to load trains");
@@ -246,10 +251,11 @@ export default function RailwayApp() {
         setTrains(trainsData);
         setDsaMetrics(dsaData);
         if (trainsData.length > 0 && trainsData[0].runs.length > 0) {
-          const firstRunId = trainsData[0].runs[0].run_id;
-          setSelectedRunId(firstRunId);
+          const validRun = trainsData[0].runs.find((r: any) => !r.run_date || r.run_date >= todayStr) || trainsData[0].runs[0];
+          setSelectedRunId(validRun.run_id);
           setSelectedTrain(trainsData[0]);
-          const layoutData = await fetchTrainLayout(firstRunId);
+          setChartRunId(validRun.run_id);
+          const layoutData = await fetchTrainLayout(validRun.run_id);
           if (mounted) setCoachLayout(layoutData);
         }
       } catch (err: any) {
@@ -260,7 +266,21 @@ export default function RailwayApp() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [todayStr]);
+
+  // Auto-load reservation chart when chart tab is active
+  useEffect(() => {
+    if (activeTab === "chart" && !chartData && !loadingChart && trains.length > 0) {
+      const targetRunId =
+        chartRunId ||
+        selectedRunId ||
+        trains[0]?.runs?.find((r: any) => !r.run_date || r.run_date >= todayStr)?.run_id ||
+        trains[0]?.runs?.[0]?.run_id;
+      if (targetRunId) {
+        handleLoadChart(targetRunId);
+      }
+    }
+  }, [activeTab, chartData, loadingChart, chartRunId, selectedRunId, trains, todayStr]);
 
   // Timer countdown for held seat
   useEffect(() => {
@@ -453,15 +473,16 @@ export default function RailwayApp() {
   };
 
   const handleLoadChart = async (runId: number) => {
-    setLoading(true);
+    setLoadingChart(true);
     try {
       const data = await fetchReservationChart(runId);
       setChartData(data);
       setChartRunId(runId);
     } catch (err: any) {
       setError(err.message || "Failed to load reservation chart");
+      notify("error", "Chart Load Error", err.message || "Failed to load reservation chart");
     } finally {
-      setLoading(false);
+      setLoadingChart(false);
     }
   };
 
@@ -537,7 +558,7 @@ export default function RailwayApp() {
   return (
     <div
       className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${
-        isLight ? "bg-[#FFF6DC] text-[#425B9A]" : "bg-[#091540] text-slate-100"
+        isLight ? "bg-[#FFF6DC] text-[#425B9A]" : "bg-[#222831] text-[#DFD0B8]"
       }`}
     >
       {/* ===================== TOP HEADER & NAVIGATION ===================== */}
@@ -545,7 +566,7 @@ export default function RailwayApp() {
         className={`sticky top-0 z-50 px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between border-b transition-colors ${
           isLight
             ? "bg-white/95 text-[#425B9A] border-[#76C0EC]/50 shadow-md backdrop-blur-md"
-            : "bg-[#091540]/95 text-white border-[#1B2CC1]/40 shadow-xl backdrop-blur-md"
+            : "bg-[#222831]/95 text-[#DFD0B8] border-[#393E46] shadow-xl backdrop-blur-md"
         }`}
       >
         {/* Brand / Logo */}
@@ -554,7 +575,7 @@ export default function RailwayApp() {
             src="/icon.svg"
             alt="RailDSA Engine Logo"
             className={`h-10 w-10 rounded-xl p-1 shadow-md transition-transform hover:scale-105 ${
-              isLight ? "bg-[#FFF6DC] border border-[#76C0EC]" : "bg-[#1B2CC1]/20 border border-[#7692FF]/40"
+              isLight ? "bg-[#FFF6DC] border border-[#76C0EC]" : "bg-[#393E46] border border-[#948979]/50"
             }`}
           />
           <div>
@@ -564,7 +585,7 @@ export default function RailwayApp() {
                 className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                   isLight
                     ? "bg-[#FF95A5] text-[#425B9A]"
-                    : "bg-[#1B2CC1] text-[#ABD2FA] border border-[#7692FF]/50"
+                    : "bg-[#393E46] text-[#DFD0B8] border border-[#948979]/50"
                 }`}
               >
                 Kolkata Hub
@@ -572,7 +593,7 @@ export default function RailwayApp() {
             </div>
             <p
               className={`text-[11px] font-medium tracking-wide ${
-                isLight ? "text-[#425B9A]/80" : "text-[#ABD2FA]/80"
+                isLight ? "text-[#425B9A]/80" : "text-[#948979]"
               }`}
             >
               Eastern Railway In-Memory Hash/Heap Academic Engine
@@ -586,7 +607,7 @@ export default function RailwayApp() {
             className={`flex items-center space-x-1 p-1 rounded-xl border ${
               isLight
                 ? "bg-[#FFF6DC] border-[#76C0EC]/60"
-                : "bg-[#0d1c54] border-[#1B2CC1]/60"
+                : "bg-[#393E46] border-[#948979]/40"
             }`}
           >
             {[
@@ -603,17 +624,26 @@ export default function RailwayApp() {
                   key={tab.id}
                   onClick={() => {
                     setActiveTab(tab.id as any);
-                    if (tab.id === "chart" && !chartData && selectedRunId) handleLoadChart(selectedRunId);
+                    if (tab.id === "chart") {
+                      const targetRunId =
+                        chartRunId ||
+                        selectedRunId ||
+                        trains[0]?.runs?.find((r: any) => !r.run_date || r.run_date >= todayStr)?.run_id ||
+                        trains[0]?.runs?.[0]?.run_id;
+                      if (targetRunId && (!chartData || chartRunId !== targetRunId)) {
+                        handleLoadChart(targetRunId);
+                      }
+                    }
                     if (tab.id === "dsa") loadDSAMetrics();
                   }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
                     isActive
                       ? isLight
                         ? "bg-[#425B9A] text-white shadow-md"
-                        : "bg-[#1B2CC1] text-white shadow-lg shadow-[#1B2CC1]/40 border border-[#7692FF]/50"
+                        : "bg-[#DFD0B8] text-[#222831] font-black shadow-lg shadow-[#222831]/50"
                       : isLight
                       ? "text-[#425B9A]/75 hover:text-[#425B9A] hover:bg-[#76C0EC]/20"
-                      : "text-[#ABD2FA]/70 hover:text-white hover:bg-[#1B2CC1]/20"
+                      : "text-[#DFD0B8]/70 hover:text-[#DFD0B8] hover:bg-[#948979]/20"
                   }`}
                 >
                   <Icon className="h-3.5 w-3.5" />
@@ -629,7 +659,7 @@ export default function RailwayApp() {
             className={`p-2 rounded-xl border flex items-center space-x-1.5 text-xs font-bold transition cursor-pointer ${
               isLight
                 ? "bg-white border-[#76C0EC] text-[#425B9A] hover:bg-[#76C0EC]/20"
-                : "bg-[#0d1c54] border-[#1B2CC1] text-[#ABD2FA] hover:text-white hover:bg-[#1B2CC1]/40"
+                : "bg-[#393E46] border-[#948979]/50 text-[#DFD0B8] hover:bg-[#948979]/30"
             }`}
             title="Toggle Light / Dark Theme"
           >
@@ -640,7 +670,7 @@ export default function RailwayApp() {
               </>
             ) : (
               <>
-                <Sun className="h-4 w-4 text-amber-300" />
+                <Sun className="h-4 w-4 text-[#DFD0B8]" />
                 <span className="hidden lg:inline">Light</span>
               </>
             )}
@@ -663,15 +693,15 @@ export default function RailwayApp() {
 
       {/* Main Content Max Width Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
-        {/* ===================== TAB 1: SEARCH & BOOK (WIREFRAME REFERENCE) ===================== */}
+        {/* ===================== TAB 1: SEARCH & BOOK ===================== */}
         {activeTab === "search" && (
           <div className="space-y-6">
-            {/* 1. Step Progress Bar (Symmetrical 12 Columns) */}
+            {/* 1. Step Progress Bar */}
             <div
               className={`rounded-2xl p-4 sm:p-5 border shadow-xl transition-all ${
                 isLight
                   ? "bg-white border-[#76C0EC]/50 shadow-sm"
-                  : "bg-[#0d1c54]/80 border-[#1B2CC1]/50 shadow-lg shadow-[#091540]"
+                  : "bg-[#393E46]/90 border-[#948979]/30 shadow-lg shadow-[#222831]/60"
               }`}
             >
               <div className="grid grid-cols-3 gap-2 sm:gap-4 items-center">
@@ -682,7 +712,7 @@ export default function RailwayApp() {
                       currentStep >= 1
                         ? isLight
                           ? "bg-[#425B9A] text-white ring-2 ring-[#76C0EC]"
-                          : "bg-[#1B2CC1] text-white ring-2 ring-[#7692FF]"
+                          : "bg-[#DFD0B8] text-[#222831] font-black ring-2 ring-[#DFD0B8]/60"
                         : "bg-slate-700 text-slate-400"
                     }`}
                   >
@@ -692,7 +722,7 @@ export default function RailwayApp() {
                     <div className="text-xs font-black">Select Train</div>
                     <div
                       className={`text-[10px] hidden sm:block ${
-                        isLight ? "text-[#425B9A]/70" : "text-[#ABD2FA]/70"
+                        isLight ? "text-[#425B9A]/70" : "text-[#DFD0B8]/70"
                       }`}
                     >
                       Choose train, date &amp; class
@@ -707,10 +737,10 @@ export default function RailwayApp() {
                       currentStep >= 2
                         ? isLight
                           ? "bg-[#425B9A] text-white ring-2 ring-[#76C0EC]"
-                          : "bg-[#1B2CC1] text-white ring-2 ring-[#7692FF]"
+                          : "bg-[#DFD0B8] text-[#222831] font-black ring-2 ring-[#DFD0B8]/60"
                         : isLight
                         ? "bg-slate-200 text-slate-600"
-                        : "bg-[#091540] text-slate-400 border border-slate-700"
+                        : "bg-[#222831] text-[#948979] border border-[#948979]/40"
                     }`}
                   >
                     2
@@ -719,7 +749,7 @@ export default function RailwayApp() {
                     <div className="text-xs font-black">Passenger Details</div>
                     <div
                       className={`text-[10px] hidden sm:block ${
-                        isLight ? "text-[#425B9A]/70" : "text-[#ABD2FA]/70"
+                        isLight ? "text-[#425B9A]/70" : "text-[#DFD0B8]/70"
                       }`}
                     >
                       Enter passengers &amp; quota
@@ -734,10 +764,10 @@ export default function RailwayApp() {
                       currentStep >= 3
                         ? isLight
                           ? "bg-[#425B9A] text-white ring-2 ring-[#76C0EC]"
-                          : "bg-[#1B2CC1] text-white ring-2 ring-[#7692FF]"
+                          : "bg-[#DFD0B8] text-[#222831] font-black ring-2 ring-[#DFD0B8]/60"
                         : isLight
                         ? "bg-slate-200 text-slate-600"
-                        : "bg-[#091540] text-slate-400 border border-slate-700"
+                        : "bg-[#222831] text-[#948979] border border-[#948979]/40"
                     }`}
                   >
                     3
@@ -746,7 +776,7 @@ export default function RailwayApp() {
                     <div className="text-xs font-black">Confirm &amp; Hold</div>
                     <div
                       className={`text-[10px] hidden sm:block ${
-                        isLight ? "text-[#425B9A]/70" : "text-[#ABD2FA]/70"
+                        isLight ? "text-[#425B9A]/70" : "text-[#DFD0B8]/70"
                       }`}
                     >
                       Review, fare &amp; temporary hold
@@ -756,20 +786,20 @@ export default function RailwayApp() {
               </div>
             </div>
 
-            {/* 2. Symmetrical Search & Filters Bar (12 Columns) */}
+            {/* 2. Symmetrical Search & Filters Bar */}
             <div
               className={`rounded-2xl p-4 sm:p-5 border shadow-xl transition-all ${
                 isLight
                   ? "bg-white border-[#76C0EC]/50 shadow-sm"
-                  : "bg-[#0d1c54]/80 border-[#1B2CC1]/50 shadow-lg shadow-[#091540]"
+                  : "bg-[#393E46]/90 border-[#948979]/30 shadow-lg shadow-[#222831]/60"
               }`}
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-center">
-                {/* From Station (lg: 3 cols) */}
+                {/* From Station */}
                 <div className="lg:col-span-3">
                   <label
                     className={`block text-[11px] font-bold mb-1 flex items-center space-x-1 ${
-                      isLight ? "text-[#425B9A]" : "text-[#ABD2FA]"
+                      isLight ? "text-[#425B9A]" : "text-[#DFD0B8]"
                     }`}
                   >
                     <Train className="h-3 w-3" />
@@ -781,7 +811,7 @@ export default function RailwayApp() {
                     className={`w-full text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer transition ${
                       isLight
                         ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]"
-                        : "bg-[#091540] border-[#1B2CC1] text-white focus:border-[#7692FF]"
+                        : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8] focus:border-[#DFD0B8]"
                     }`}
                   >
                     <option value="ALL">All Origins</option>
@@ -793,14 +823,14 @@ export default function RailwayApp() {
                   </select>
                 </div>
 
-                {/* Swap Button (lg: 1 col) */}
+                {/* Swap Button */}
                 <div className="lg:col-span-1 flex justify-center pt-5">
                   <button
                     onClick={handleSwapStations}
                     className={`p-2 rounded-xl border transition cursor-pointer ${
                       isLight
                         ? "bg-[#FFF6DC] border-[#76C0EC] hover:bg-[#76C0EC]/30 text-[#425B9A]"
-                        : "bg-[#091540] border-[#1B2CC1] hover:border-[#7692FF] text-[#7692FF]"
+                        : "bg-[#222831] border-[#948979]/50 hover:border-[#DFD0B8] text-[#DFD0B8]"
                     }`}
                     title="Swap route stations"
                   >
@@ -808,11 +838,11 @@ export default function RailwayApp() {
                   </button>
                 </div>
 
-                {/* To Station (lg: 3 cols) */}
+                {/* To Station */}
                 <div className="lg:col-span-3">
                   <label
                     className={`block text-[11px] font-bold mb-1 flex items-center space-x-1 ${
-                      isLight ? "text-[#425B9A]" : "text-[#ABD2FA]"
+                      isLight ? "text-[#425B9A]" : "text-[#DFD0B8]"
                     }`}
                   >
                     <MapPin className="h-3 w-3" />
@@ -824,7 +854,7 @@ export default function RailwayApp() {
                     className={`w-full text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer transition ${
                       isLight
                         ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]"
-                        : "bg-[#091540] border-[#1B2CC1] text-white focus:border-[#7692FF]"
+                        : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8] focus:border-[#DFD0B8]"
                     }`}
                   >
                     <option value="ALL">All Destinations</option>
@@ -836,11 +866,11 @@ export default function RailwayApp() {
                   </select>
                 </div>
 
-                {/* Journey Date (lg: 2 cols) */}
+                {/* Journey Date */}
                 <div className="lg:col-span-2">
                   <label
                     className={`block text-[11px] font-bold mb-1 flex items-center space-x-1 ${
-                      isLight ? "text-[#425B9A]" : "text-[#ABD2FA]"
+                      isLight ? "text-[#425B9A]" : "text-[#DFD0B8]"
                     }`}
                   >
                     <Calendar className="h-3 w-3" />
@@ -852,7 +882,7 @@ export default function RailwayApp() {
                     className={`w-full text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer transition ${
                       isLight
                         ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]"
-                        : "bg-[#091540] border-[#1B2CC1] text-white focus:border-[#7692FF]"
+                        : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8] focus:border-[#DFD0B8]"
                     }`}
                   >
                     <option value="ALL">All Schedule Dates</option>
@@ -864,11 +894,11 @@ export default function RailwayApp() {
                   </select>
                 </div>
 
-                {/* Train Search Input + Action Button (lg: 3 cols) */}
+                {/* Search Input & Action */}
                 <div className="lg:col-span-3">
                   <label
                     className={`block text-[11px] font-bold mb-1 flex items-center space-x-1 ${
-                      isLight ? "text-[#425B9A]" : "text-[#ABD2FA]"
+                      isLight ? "text-[#425B9A]" : "text-[#DFD0B8]"
                     }`}
                   >
                     <Search className="h-3 w-3" />
@@ -884,7 +914,7 @@ export default function RailwayApp() {
                         className={`w-full pl-3 pr-7 py-2 text-xs font-semibold rounded-xl border outline-none transition ${
                           isLight
                             ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A] placeholder-[#425B9A]/60"
-                            : "bg-[#091540] border-[#1B2CC1] text-white placeholder-slate-400 focus:border-[#7692FF]"
+                            : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8] placeholder-[#948979] focus:border-[#DFD0B8]"
                         }`}
                       />
                       {searchQuery && (
@@ -901,7 +931,7 @@ export default function RailwayApp() {
                       className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1 transition cursor-pointer shadow-md ${
                         isLight
                           ? "bg-[#425B9A] text-white hover:bg-[#334677]"
-                          : "bg-[#1B2CC1] text-white hover:bg-[#1523a0] border border-[#7692FF]/50"
+                          : "bg-[#DFD0B8] text-[#222831] hover:bg-[#cfbe9e] font-black"
                       }`}
                     >
                       <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
@@ -920,13 +950,13 @@ export default function RailwayApp() {
                   className={`rounded-2xl p-4 sm:p-5 border shadow-xl transition-all ${
                     isLight
                       ? "bg-white border-[#76C0EC]/50 shadow-sm"
-                      : "bg-[#0d1c54]/80 border-[#1B2CC1]/50 shadow-lg shadow-[#091540]"
+                      : "bg-[#393E46]/90 border-[#948979]/30 shadow-lg shadow-[#222831]/60"
                   }`}
                 >
                   {/* Header & Sort */}
                   <div className="flex items-center justify-between mb-3.5 pb-2.5 border-b border-dashed border-slate-700/30">
                     <div className="flex items-center space-x-2">
-                      <Train className={`h-4 w-4 ${isLight ? "text-[#425B9A]" : "text-[#7692FF]"}`} />
+                      <Train className={`h-4 w-4 ${isLight ? "text-[#425B9A]" : "text-[#DFD0B8]"}`} />
                       <h2 className="text-sm font-extrabold">Available Trains ({filteredTrains.length})</h2>
                     </div>
                     <select
@@ -935,7 +965,7 @@ export default function RailwayApp() {
                       className={`text-[10px] font-bold rounded-lg px-2 py-1 border outline-none cursor-pointer ${
                         isLight
                           ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]"
-                          : "bg-[#091540] border-[#1B2CC1] text-[#ABD2FA]"
+                          : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8]"
                       }`}
                     >
                       <option value="time">Sort: Departure Time</option>
@@ -949,7 +979,7 @@ export default function RailwayApp() {
                       className={`p-6 rounded-2xl border text-center space-y-3 ${
                         isLight
                           ? "bg-[#FFF6DC]/50 border-[#76C0EC]/60 text-[#425B9A]"
-                          : "bg-[#091540] border-[#1B2CC1] text-slate-300"
+                          : "bg-[#222831] border-[#948979]/40 text-[#DFD0B8]"
                       }`}
                     >
                       <SearchX className="h-7 w-7 mx-auto opacity-60" />
@@ -971,7 +1001,7 @@ export default function RailwayApp() {
                         className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
                           isLight
                             ? "bg-[#425B9A] text-white hover:bg-[#334677]"
-                            : "bg-[#1B2CC1] text-white hover:bg-[#1523a0] border-[#7692FF]/50"
+                            : "bg-[#DFD0B8] text-[#222831] hover:bg-[#cfbe9e] font-black"
                         }`}
                       >
                         Show All Trains ({trains.length})
@@ -981,8 +1011,9 @@ export default function RailwayApp() {
                     <div className="space-y-2.5">
                       {filteredTrains.map((t) => {
                         const isSelectedTrain = selectedTrain?.id === t.id;
-                        const firstRun = t.runs?.[0];
-                        const totalAvail = t.runs?.reduce((acc: number, r: any) => acc + (r.available_berths || 0), 0);
+                        const futureRuns = (t.runs || []).filter((r: any) => !r.run_date || r.run_date >= todayStr);
+                        const firstRun = futureRuns[0] || t.runs?.[0];
+                        const totalAvail = (futureRuns.length > 0 ? futureRuns : t.runs || []).reduce((acc: number, r: any) => acc + (r.available_berths || 0), 0);
 
                         return (
                           <div
@@ -998,10 +1029,10 @@ export default function RailwayApp() {
                               isSelectedTrain
                                 ? isLight
                                   ? "bg-[#FFF6DC] border-2 border-[#425B9A] shadow-md ring-2 ring-[#76C0EC]/40"
-                                  : "bg-[#1B2CC1]/20 border-2 border-[#7692FF] shadow-lg shadow-[#1B2CC1]/30 ring-1 ring-[#7692FF]/50"
+                                  : "bg-[#222831] border-2 border-[#DFD0B8] shadow-lg shadow-[#222831] ring-1 ring-[#DFD0B8]/50"
                                 : isLight
                                 ? "bg-white border-[#76C0EC]/40 hover:border-[#425B9A] shadow-sm"
-                                : "bg-[#091540]/60 border-[#1B2CC1]/30 hover:border-[#7692FF]/50"
+                                : "bg-[#222831]/60 border-[#948979]/30 hover:border-[#DFD0B8]/60"
                             }`}
                           >
                             <div className="flex items-start justify-between">
@@ -1011,7 +1042,7 @@ export default function RailwayApp() {
                                     className={`text-[10px] font-mono font-black px-2 py-0.5 rounded-md ${
                                       isLight
                                         ? "bg-[#425B9A] text-white"
-                                        : "bg-[#1B2CC1] text-[#ABD2FA] border border-[#7692FF]/40"
+                                        : "bg-[#393E46] text-[#DFD0B8] border border-[#948979]/50"
                                     }`}
                                   >
                                     {t.train_number}
@@ -1020,7 +1051,7 @@ export default function RailwayApp() {
                                 </div>
                                 <div
                                   className={`text-[10px] font-semibold flex items-center space-x-1 ${
-                                    isLight ? "text-[#425B9A]/80" : "text-[#ABD2FA]/80"
+                                    isLight ? "text-[#425B9A]/80" : "text-[#DFD0B8]/80"
                                   }`}
                                 >
                                   <span>{t.source_station}</span>
@@ -1039,8 +1070,8 @@ export default function RailwayApp() {
                               <span
                                 className={`px-2 py-0.5 rounded-full font-black ${
                                   totalAvail > 0
-                                    ? "bg-emerald-500/20 text-emerald-600 border border-emerald-500/30"
-                                    : "bg-amber-500/20 text-amber-600 border border-amber-500/30"
+                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                    : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                                 }`}
                               >
                                 {totalAvail > 0 ? `AVL ${totalAvail}` : "WL Active"}
@@ -1062,7 +1093,7 @@ export default function RailwayApp() {
                     className={`rounded-2xl p-5 sm:p-6 border shadow-xl transition-all space-y-4 ${
                       isLight
                         ? "bg-white border-[#76C0EC]/50 shadow-sm"
-                        : "bg-[#0d1c54]/80 border-[#1B2CC1]/50 shadow-lg shadow-[#091540]"
+                        : "bg-[#393E46]/90 border-[#948979]/30 shadow-lg shadow-[#222831]/60"
                     }`}
                   >
                     {/* Train Title Row */}
@@ -1070,7 +1101,7 @@ export default function RailwayApp() {
                       <div className="flex items-center space-x-3">
                         <div
                           className={`p-2.5 rounded-xl border ${
-                            isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#091540] border-[#1B2CC1] text-[#7692FF]"
+                            isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8]"
                           }`}
                         >
                           <Train className="h-5 w-5" />
@@ -1081,18 +1112,18 @@ export default function RailwayApp() {
                           </h2>
                           <div
                             className={`text-xs font-semibold flex items-center space-x-1 mt-0.5 ${
-                              isLight ? "text-[#425B9A]/80" : "text-[#ABD2FA]"
+                              isLight ? "text-[#425B9A]/80" : "text-[#DFD0B8]/80"
                             }`}
                           >
                             <span>{selectedTrain.source_station}</span>
                             <span>&rarr;</span>
                             <span>{selectedTrain.destination_station}</span>
                             <span>&bull;</span>
-                            <span>{coachLayout?.run_date || "2026-11-08"}</span>
+                            <span>{coachLayout?.run_date || todayStr}</span>
                           </div>
                         </div>
                       </div>
-                      <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-600 border border-emerald-500/30 self-start sm:self-center">
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 self-start sm:self-center">
                         Live (In-Memory)
                       </span>
                     </div>
@@ -1101,14 +1132,16 @@ export default function RailwayApp() {
                     <div>
                       <div
                         className={`text-[11px] font-bold mb-2 flex items-center space-x-1 ${
-                          isLight ? "text-[#425B9A]" : "text-[#ABD2FA]"
+                          isLight ? "text-[#425B9A]" : "text-[#DFD0B8]"
                         }`}
                       >
                         <Calendar className="h-3.5 w-3.5" />
                         <span>Select Scheduled Date:</span>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {selectedTrain.runs?.map((r: any) => {
+                        {selectedTrain.runs
+                          ?.filter((r: any) => !r.run_date || r.run_date >= todayStr)
+                          .map((r: any) => {
                           const isRunSelected = selectedRunId === r.run_id;
                           return (
                             <button
@@ -1118,10 +1151,10 @@ export default function RailwayApp() {
                                 isRunSelected
                                   ? isLight
                                     ? "bg-[#425B9A] text-white border-[#425B9A] shadow-md ring-2 ring-[#76C0EC]/50"
-                                    : "bg-[#1B2CC1] text-white border-[#7692FF] shadow-lg shadow-[#1B2CC1]/40 ring-1 ring-[#7692FF]"
+                                    : "bg-[#DFD0B8] text-[#222831] font-black border-[#DFD0B8] shadow-md ring-1 ring-[#DFD0B8]/50"
                                   : isLight
                                   ? "bg-[#FFF6DC] border-[#76C0EC]/60 text-[#425B9A] hover:bg-[#76C0EC]/20"
-                                  : "bg-[#091540] border-[#1B2CC1]/50 text-[#ABD2FA] hover:text-white"
+                                  : "bg-[#222831] border-[#948979]/40 text-[#DFD0B8] hover:border-[#DFD0B8]"
                               }`}
                             >
                               <span>{r.run_date}</span>
@@ -1144,10 +1177,10 @@ export default function RailwayApp() {
                     <div className="pt-3 border-t border-dashed border-slate-700/30">
                       <div
                         className={`text-[11px] font-bold mb-2 flex items-center space-x-1.5 ${
-                          isLight ? "text-[#425B9A]" : "text-[#ABD2FA]"
+                          isLight ? "text-[#425B9A]" : "text-[#DFD0B8]"
                         }`}
                       >
-                        <ShieldCheck className="h-3.5 w-3.5 text-[#7692FF]" />
+                        <ShieldCheck className="h-3.5 w-3.5 text-[#DFD0B8]" />
                         <span>Reservation Quota:</span>
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -1164,10 +1197,10 @@ export default function RailwayApp() {
                               quota === q.id
                                 ? isLight
                                   ? "bg-[#425B9A] text-white border-[#425B9A] shadow-md ring-2 ring-[#76C0EC]/50"
-                                  : "bg-[#1B2CC1] text-white border-[#7692FF] shadow-lg shadow-[#1B2CC1]/40 ring-1 ring-[#7692FF]"
+                                  : "bg-[#DFD0B8] text-[#222831] font-black border-[#DFD0B8] shadow-md ring-1 ring-[#DFD0B8]/50"
                                 : isLight
                                 ? "bg-[#FFF6DC] border-[#76C0EC]/50 text-[#425B9A] hover:bg-[#76C0EC]/20"
-                                : "bg-[#091540] border-[#1B2CC1]/50 text-[#ABD2FA] hover:text-white"
+                                : "bg-[#222831] border-[#948979]/40 text-[#DFD0B8] hover:border-[#DFD0B8]"
                             }`}
                           >
                             <div className="font-extrabold text-xs">{q.name}</div>
@@ -1182,13 +1215,13 @@ export default function RailwayApp() {
                       <div className="flex items-center justify-between mb-2">
                         <div
                           className={`text-[11px] font-bold flex items-center space-x-1.5 ${
-                            isLight ? "text-[#425B9A]" : "text-[#ABD2FA]"
+                            isLight ? "text-[#425B9A]" : "text-[#DFD0B8]"
                           }`}
                         >
-                          <Layers className="h-3.5 w-3.5 text-[#7692FF]" />
+                          <Layers className="h-3.5 w-3.5 text-[#DFD0B8]" />
                           <span>Select Travel Class:</span>
                         </div>
-                        <span className="text-xs font-black text-emerald-500">
+                        <span className="text-xs font-black text-emerald-400">
                           {selectedClass === "ALL" ? "Total" : selectedClass} Availability: {currentClassAvailability} berths
                         </span>
                       </div>
@@ -1206,10 +1239,10 @@ export default function RailwayApp() {
                               selectedClass === cls.id
                                 ? isLight
                                   ? "bg-[#425B9A] text-white border-[#425B9A] shadow-md"
-                                  : "bg-[#1B2CC1] text-white border-[#7692FF] shadow-md shadow-[#1B2CC1]/40"
+                                  : "bg-[#DFD0B8] text-[#222831] font-black border-[#DFD0B8] shadow-md"
                                 : isLight
                                 ? "bg-[#FFF6DC] border-[#76C0EC]/50 text-[#425B9A] hover:bg-[#76C0EC]/20"
-                                : "bg-[#091540] border-[#1B2CC1]/50 text-[#ABD2FA] hover:text-white"
+                                : "bg-[#222831] border-[#948979]/40 text-[#DFD0B8] hover:border-[#DFD0B8]"
                             }`}
                           >
                             {cls.name}
@@ -1225,7 +1258,7 @@ export default function RailwayApp() {
                           <h4 className="text-xs font-black">Live Coach Layout ({coachLayout.coaches?.length} Coaches)</h4>
                           <span
                             className={`text-[10px] font-semibold ${
-                              isLight ? "text-[#425B9A]/80" : "text-[#ABD2FA]"
+                              isLight ? "text-[#425B9A]/80" : "text-[#DFD0B8]/80"
                             }`}
                           >
                             In-Memory Grid Verification
@@ -1241,7 +1274,7 @@ export default function RailwayApp() {
                                 className={`rounded-xl p-3 border ${
                                   isLight
                                     ? "bg-[#FFF6DC]/50 border-[#76C0EC]/50"
-                                    : "bg-[#091540] border-[#1B2CC1]/50"
+                                    : "bg-[#222831] border-[#948979]/40"
                                 }`}
                               >
                                 <div className="flex items-center justify-between mb-2">
@@ -1256,16 +1289,16 @@ export default function RailwayApp() {
                                   {c.berths.map((b: any) => {
                                     let badgeBg = isLight
                                       ? "bg-white text-[#425B9A] border-[#76C0EC]/60 hover:border-[#425B9A]"
-                                      : "bg-emerald-950/40 border-emerald-800 text-emerald-300";
+                                      : "bg-[#393E46] border-[#948979]/60 text-[#DFD0B8]";
 
                                     if (b.status === "HELD")
                                       badgeBg = isLight
                                         ? "bg-[#FF95A5]/30 border-[#FF95A5] text-[#425B9A] font-bold"
-                                        : "bg-amber-950/60 border-amber-800 text-amber-300";
+                                        : "bg-amber-500/20 text-amber-400 border border-amber-500/40";
                                     else if (b.status === "CONFIRMED")
                                       badgeBg = isLight
                                         ? "bg-[#425B9A] text-white border-[#425B9A]"
-                                        : "bg-rose-950/60 border-rose-800 text-rose-300";
+                                        : "bg-rose-500/20 text-rose-400 border border-rose-500/40";
 
                                     return (
                                       <div
@@ -1294,7 +1327,7 @@ export default function RailwayApp() {
                           </span>
                           <span className="flex items-center space-x-1.5">
                             <span
-                              className={`h-2.5 w-2.5 rounded-full ${isLight ? "bg-[#425B9A]" : "bg-[#1B2CC1]"}`}
+                              className={`h-2.5 w-2.5 rounded-full ${isLight ? "bg-[#425B9A]" : "bg-[#DFD0B8]"}`}
                             ></span>
                             <span className="font-semibold">Confirmed</span>
                           </span>
@@ -1304,20 +1337,20 @@ export default function RailwayApp() {
                   </div>
                 )}
 
-                {/* 2. Passenger Booking Entry Form (MMT / ConfirmTkt Style) */}
+                {/* 2. Passenger Booking Entry Form */}
                 {!holdResult && !bookingConfirmed && (
                   <div
                     className={`rounded-2xl p-5 sm:p-6 border shadow-xl space-y-5 transition-all ${
                       isLight
                         ? "bg-white border-[#76C0EC]/50 shadow-sm"
-                        : "bg-[#0d1c54]/80 border-[#1B2CC1]/50 shadow-lg shadow-[#091540]"
+                        : "bg-[#393E46]/90 border-[#948979]/30 shadow-lg shadow-[#222831]/60"
                     }`}
                   >
                     <div className="flex items-center justify-between pb-4 border-b border-dashed border-slate-700/30">
                       <div className="flex items-center space-x-3">
                         <div
                           className={`p-2.5 rounded-xl border ${
-                            isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#091540] border-[#1B2CC1] text-[#7692FF]"
+                            isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8]"
                           }`}
                         >
                           <Users className="h-5 w-5" />
@@ -1327,7 +1360,7 @@ export default function RailwayApp() {
                             <h3 className="text-base font-black">Passenger Details</h3>
                             <span
                               className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
-                                isLight ? "bg-[#FF95A5] text-[#425B9A]" : "bg-[#1B2CC1] text-[#ABD2FA]"
+                                isLight ? "bg-[#FF95A5] text-[#425B9A]" : "bg-[#222831] text-[#DFD0B8] border border-[#948979]/40"
                               }`}
                             >
                               Quota: {quota}
@@ -1335,7 +1368,7 @@ export default function RailwayApp() {
                           </div>
                           <p
                             className={`text-xs mt-0.5 font-medium ${
-                              isLight ? "text-[#425B9A]/80" : "text-[#ABD2FA]/80"
+                              isLight ? "text-[#425B9A]/80" : "text-[#948979]"
                             }`}
                           >
                             Authorized IRCTC reservation format (Max 4 passengers per PNR)
@@ -1348,7 +1381,7 @@ export default function RailwayApp() {
                         className={`px-3.5 py-2 border disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
                           isLight
                             ? "bg-[#FFF6DC] hover:bg-[#76C0EC]/30 border-[#76C0EC] text-[#425B9A]"
-                            : "bg-[#091540] hover:bg-[#1B2CC1]/30 border-[#1B2CC1] text-[#ABD2FA]"
+                            : "bg-[#222831] hover:border-[#DFD0B8] border-[#948979]/50 text-[#DFD0B8]"
                         }`}
                       >
                         <UserPlus className="h-3.5 w-3.5" />
@@ -1370,14 +1403,14 @@ export default function RailwayApp() {
                             className={`p-4 rounded-2xl border transition-all space-y-3 shadow-sm ${
                               isLight
                                 ? "bg-[#FFF6DC]/40 border-[#76C0EC]/50 hover:border-[#425B9A]"
-                                : "bg-[#091540] border-[#1B2CC1]/60 hover:border-[#7692FF]"
+                                : "bg-[#222831] border-[#948979]/40 hover:border-[#DFD0B8]"
                             }`}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-2.5">
                                 <span
                                   className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${
-                                    isLight ? "bg-[#425B9A] text-white" : "bg-[#1B2CC1] text-white"
+                                    isLight ? "bg-[#425B9A] text-white" : "bg-[#393E46] text-[#DFD0B8] border border-[#948979]/50"
                                   }`}
                                 >
                                   {idx + 1}
@@ -1386,22 +1419,22 @@ export default function RailwayApp() {
                                   {idx === 0 ? "Primary Passenger" : `Passenger #${idx + 1}`}
                                 </span>
                                 {isSenior && (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/20 text-emerald-600 border border-emerald-500/40">
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
                                     🧓 Senior Citizen (SS Quota Priority)
                                   </span>
                                 )}
                                 {isChild && (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-black bg-sky-500/20 text-sky-600 border border-sky-500/40">
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-black bg-sky-500/20 text-sky-400 border border-sky-500/40">
                                     🧒 Child (5-11 yrs)
                                   </span>
                                 )}
                                 {isInfant && (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-600 border border-amber-500/40">
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/40">
                                     🍼 Infant (No Berth Required)
                                   </span>
                                 )}
                                 {p.gender === "F" && quota === "LD" && (
-                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-600 border border-purple-500/40">
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/40">
                                     Ladies Quota Applied
                                   </span>
                                 )}
@@ -1409,7 +1442,7 @@ export default function RailwayApp() {
                               {passengers.length > 1 && (
                                 <button
                                   onClick={() => handleRemovePassenger(idx)}
-                                  className="text-rose-500 hover:text-rose-700 p-1 rounded-lg hover:bg-rose-100/50 transition text-xs flex items-center space-x-1 cursor-pointer"
+                                  className="text-rose-500 hover:text-rose-400 p-1 rounded-lg hover:bg-rose-950/40 transition text-xs flex items-center space-x-1 cursor-pointer"
                                   title="Remove passenger"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
@@ -1432,7 +1465,7 @@ export default function RailwayApp() {
                                   className={`w-full rounded-xl px-3 py-2 text-xs font-semibold transition outline-none border ${
                                     isLight
                                       ? "bg-white border-[#76C0EC] text-[#425B9A] focus:border-[#425B9A]"
-                                      : "bg-[#0d1c54] border-[#1B2CC1] text-white focus:border-[#7692FF]"
+                                      : "bg-[#393E46] border-[#948979]/50 text-[#DFD0B8] focus:border-[#DFD0B8]"
                                   }`}
                                 />
                               </div>
@@ -1449,7 +1482,7 @@ export default function RailwayApp() {
                                   className={`w-full rounded-xl px-3 py-2 text-xs font-semibold transition outline-none border ${
                                     isLight
                                       ? "bg-white border-[#76C0EC] text-[#425B9A] focus:border-[#425B9A]"
-                                      : "bg-[#0d1c54] border-[#1B2CC1] text-white focus:border-[#7692FF]"
+                                      : "bg-[#393E46] border-[#948979]/50 text-[#DFD0B8] focus:border-[#DFD0B8]"
                                   }`}
                                 />
                               </div>
@@ -1466,7 +1499,7 @@ export default function RailwayApp() {
                                   className={`w-full rounded-xl px-3 py-2 text-xs font-semibold transition outline-none border ${
                                     isLight
                                       ? "bg-white border-[#76C0EC] text-[#425B9A] focus:border-[#425B9A]"
-                                      : "bg-[#0d1c54] border-[#1B2CC1] text-white focus:border-[#7692FF]"
+                                      : "bg-[#393E46] border-[#948979]/50 text-[#DFD0B8] focus:border-[#DFD0B8]"
                                   }`}
                                 />
                               </div>
@@ -1489,7 +1522,7 @@ export default function RailwayApp() {
                                   className={`w-full rounded-xl px-3 py-2 text-xs font-bold transition outline-none font-mono border ${
                                     isLight
                                       ? "bg-white border-[#76C0EC] text-[#425B9A] focus:border-[#425B9A]"
-                                      : "bg-[#0d1c54] border-[#1B2CC1] text-white focus:border-[#7692FF]"
+                                      : "bg-[#393E46] border-[#948979]/50 text-[#DFD0B8] focus:border-[#DFD0B8]"
                                   }`}
                                 />
                               </div>
@@ -1504,7 +1537,7 @@ export default function RailwayApp() {
                                   className={`w-full rounded-xl px-2.5 py-2 text-xs font-bold transition outline-none cursor-pointer border ${
                                     isLight
                                       ? "bg-white border-[#76C0EC] text-[#425B9A]"
-                                      : "bg-[#0d1c54] border-[#1B2CC1] text-white"
+                                      : "bg-[#393E46] border-[#948979]/50 text-[#DFD0B8]"
                                   }`}
                                 >
                                   <option value="M">Male (M)</option>
@@ -1523,7 +1556,7 @@ export default function RailwayApp() {
                                   className={`w-full rounded-xl px-2.5 py-2 text-xs font-bold transition outline-none cursor-pointer border ${
                                     isLight
                                       ? "bg-white border-[#76C0EC] text-[#425B9A]"
-                                      : "bg-[#0d1c54] border-[#1B2CC1] text-white"
+                                      : "bg-[#393E46] border-[#948979]/50 text-[#DFD0B8]"
                                   }`}
                                 >
                                   <option value="NO_PREF">No Preference (Optimal Allocation)</option>
@@ -1545,7 +1578,7 @@ export default function RailwayApp() {
                       className={`p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 border ${
                         isLight
                           ? "bg-[#FFF6DC] border-[#76C0EC]/60"
-                          : "bg-[#091540] border-[#1B2CC1]/80"
+                          : "bg-[#222831] border-[#948979]/40"
                       }`}
                     >
                       <div className="flex items-center space-x-4">
@@ -1553,7 +1586,7 @@ export default function RailwayApp() {
                           <span className="text-[10px] opacity-75 uppercase tracking-wider block font-bold">
                             Fare Summary
                           </span>
-                          <div className="text-xl font-black text-emerald-500">
+                          <div className="text-xl font-black text-emerald-400">
                             ₹{500 * passengers.length}{" "}
                             <span className="text-xs font-semibold opacity-75 text-inherit">
                               ({passengers.length} × ₹500)
@@ -1583,7 +1616,7 @@ export default function RailwayApp() {
                         className={`w-full sm:w-auto px-7 py-3 rounded-xl font-bold transition text-xs flex items-center justify-center space-x-2 cursor-pointer shadow-lg ${
                           isLight
                             ? "bg-[#425B9A] hover:bg-[#334677] text-white shadow-[#425B9A]/20"
-                            : "bg-[#1B2CC1] hover:bg-[#1523a0] text-white shadow-lg shadow-[#1B2CC1]/40 border border-[#7692FF]/50"
+                            : "bg-[#DFD0B8] hover:bg-[#cfbe9e] text-[#222831] font-black shadow-lg shadow-[#222831]"
                         }`}
                       >
                         <Lock className="h-3.5 w-3.5" />
@@ -1600,12 +1633,12 @@ export default function RailwayApp() {
                     className={`rounded-2xl p-6 border-2 shadow-2xl space-y-4 ${
                       isLight
                         ? "bg-white border-[#425B9A] text-[#425B9A]"
-                        : "bg-[#0d1c54] border-[#7692FF] text-white shadow-lg shadow-[#1B2CC1]/30"
+                        : "bg-[#393E46] border-2 border-[#DFD0B8] text-[#DFD0B8] shadow-xl"
                     }`}
                   >
                     <div className="flex items-center justify-between pb-4 border-b border-dashed border-slate-700/30">
                       <div>
-                        <span className="text-xs uppercase tracking-wider text-amber-500 font-extrabold flex items-center space-x-1.5">
+                        <span className="text-xs uppercase tracking-wider text-amber-400 font-extrabold flex items-center space-x-1.5">
                           <Clock className="h-4 w-4 animate-spin" />
                           <span>Seat Hold Active (Status: {holdResult.booking_status})</span>
                         </span>
@@ -1618,13 +1651,13 @@ export default function RailwayApp() {
                             className={`px-3 py-1 rounded-xl border text-xs font-bold flex items-center space-x-1 transition cursor-pointer ${
                               isLight
                                 ? "bg-[#76C0EC]/30 border-[#76C0EC] text-[#425B9A]"
-                                : "bg-[#1B2CC1]/30 border-[#7692FF] text-[#ABD2FA]"
+                                : "bg-[#222831] border-[#DFD0B8] text-[#DFD0B8] hover:bg-[#948979]/30"
                             }`}
                           >
                             {copiedPnr === holdResult.pnr ? (
                               <>
-                                <Check className="h-3.5 w-3.5 text-emerald-500" />
-                                <span className="text-emerald-500">Copied!</span>
+                                <Check className="h-3.5 w-3.5 text-emerald-400" />
+                                <span className="text-emerald-400">Copied!</span>
                               </>
                             ) : (
                               <>
@@ -1639,7 +1672,7 @@ export default function RailwayApp() {
                         <span className="text-[10px] opacity-75 uppercase font-bold block">
                           Time to Complete Payment
                         </span>
-                        <span className="text-2xl font-mono font-black text-rose-500">
+                        <span className="text-2xl font-mono font-black text-rose-400">
                           {Math.floor(holdTimeLeft / 60)}:
                           {(holdTimeLeft % 60).toString().padStart(2, "0")}
                         </span>
@@ -1654,7 +1687,7 @@ export default function RailwayApp() {
                         <div
                           key={p.id}
                           className={`flex items-center justify-between p-3 rounded-xl text-xs font-bold ${
-                            isLight ? "bg-[#FFF6DC] border border-[#76C0EC]/40" : "bg-[#091540] border border-[#1B2CC1]"
+                            isLight ? "bg-[#FFF6DC] border border-[#76C0EC]/40" : "bg-[#222831] border border-[#948979]/40"
                           }`}
                         >
                           <span>{p.name}</span>
@@ -1681,7 +1714,7 @@ export default function RailwayApp() {
                         className={`flex-1 font-bold py-3 rounded-xl transition text-xs flex items-center justify-center space-x-2 cursor-pointer shadow-lg ${
                           isLight
                             ? "bg-[#425B9A] hover:bg-[#334677] text-white"
-                            : "bg-emerald-600 hover:bg-emerald-500 text-white"
+                            : "bg-[#DFD0B8] text-[#222831] font-black hover:bg-[#cfbe9e]"
                         }`}
                       >
                         <CreditCard className="h-4 w-4" />
@@ -1690,7 +1723,7 @@ export default function RailwayApp() {
                       <button
                         onClick={() => handlePayment(false)}
                         disabled={loading}
-                        className="px-4 py-3 rounded-xl font-bold transition text-xs cursor-pointer border bg-rose-950 hover:bg-rose-900 border-rose-800 text-rose-300"
+                        className="px-4 py-3 rounded-xl font-bold transition text-xs cursor-pointer border bg-rose-950/80 hover:bg-rose-900 border-rose-800 text-rose-300"
                       >
                         Simulate Failure
                       </button>
@@ -1704,12 +1737,12 @@ export default function RailwayApp() {
                     className={`rounded-2xl p-6 border-2 shadow-2xl space-y-4 ${
                       isLight
                         ? "bg-white border-emerald-600 text-[#425B9A]"
-                        : "bg-[#0d1c54] border-emerald-500 text-white"
+                        : "bg-[#393E46] border-2 border-emerald-500 text-[#DFD0B8]"
                     }`}
                   >
                     <div className="flex items-center justify-between pb-3 border-b border-dashed border-slate-700/30">
                       <div className="flex items-center space-x-3">
-                        <CheckCircle className="h-8 w-8 text-emerald-500 shrink-0" />
+                        <CheckCircle className="h-8 w-8 text-emerald-400 shrink-0" />
                         <div>
                           <div className="flex items-center space-x-3">
                             <h3 className="text-xl font-black">
@@ -1720,13 +1753,13 @@ export default function RailwayApp() {
                               className={`px-3 py-1 rounded-xl border text-xs font-bold flex items-center space-x-1 transition cursor-pointer ${
                                 isLight
                                   ? "bg-[#76C0EC]/30 border-[#76C0EC] text-[#425B9A]"
-                                  : "bg-[#1B2CC1]/30 border-[#7692FF] text-[#ABD2FA]"
+                                  : "bg-[#222831] border-[#DFD0B8] text-[#DFD0B8]"
                               }`}
                             >
                               {copiedPnr === bookingConfirmed.pnr ? (
                                 <>
-                                  <Check className="h-3.5 w-3.5 text-emerald-500" />
-                                  <span className="text-emerald-500">Copied!</span>
+                                  <Check className="h-3.5 w-3.5 text-emerald-400" />
+                                  <span className="text-emerald-400">Copied!</span>
                                 </>
                               ) : (
                                 <>
@@ -1736,7 +1769,7 @@ export default function RailwayApp() {
                               )}
                             </button>
                           </div>
-                          <p className="text-xs text-emerald-500 font-bold mt-0.5">
+                          <p className="text-xs text-emerald-400 font-bold mt-0.5">
                             Indexed in Custom PNR Hash Table &amp; Probabilistic Bloom Filter
                           </p>
                         </div>
@@ -1748,7 +1781,7 @@ export default function RailwayApp() {
                         <div
                           key={p.id}
                           className={`p-3 rounded-xl flex items-center justify-between text-xs border ${
-                            isLight ? "bg-[#FFF6DC] border-[#76C0EC]/40" : "bg-[#091540] border-[#1B2CC1]"
+                            isLight ? "bg-[#FFF6DC] border-[#76C0EC]/40" : "bg-[#222831] border-[#948979]/40"
                           }`}
                         >
                           <div>
@@ -1785,13 +1818,13 @@ export default function RailwayApp() {
               className={`rounded-2xl p-6 border shadow-xl space-y-4 transition-all ${
                 isLight
                   ? "bg-white border-[#76C0EC]/50 text-[#425B9A]"
-                  : "bg-[#0d1c54]/80 border-[#1B2CC1]/50 text-white shadow-lg shadow-[#091540]"
+                  : "bg-[#393E46]/90 border-[#948979]/30 text-[#DFD0B8] shadow-lg shadow-[#222831]/60"
               }`}
             >
               <div className="flex items-center space-x-3">
                 <div
                   className={`p-2.5 rounded-xl border ${
-                    isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#091540] border-[#1B2CC1] text-[#7692FF]"
+                    isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8]"
                   }`}
                 >
                   <Search className="h-5 w-5" />
@@ -1800,7 +1833,7 @@ export default function RailwayApp() {
                   <h3 className="text-base font-black">Custom PNR Search with Bloom Filter Fast-Rejection</h3>
                   <p
                     className={`text-xs mt-0.5 ${
-                      isLight ? "text-[#425B9A]/80" : "text-[#ABD2FA]/80"
+                      isLight ? "text-[#425B9A]/80" : "text-[#948979]"
                     }`}
                   >
                     Demonstrates the probabilistic Bloom filter (O(k)) pre-check: if absent, it rejects immediately without querying the custom hash table or database.
@@ -1817,7 +1850,7 @@ export default function RailwayApp() {
                   className={`flex-1 rounded-xl px-4 py-2.5 text-xs font-mono font-bold tracking-wider outline-none border transition ${
                     isLight
                       ? "bg-white border-[#76C0EC] text-[#425B9A] focus:border-[#425B9A]"
-                      : "bg-[#091540] border-[#1B2CC1] text-white focus:border-[#7692FF]"
+                      : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8] focus:border-[#DFD0B8]"
                   }`}
                 />
                 <button
@@ -1826,7 +1859,7 @@ export default function RailwayApp() {
                   className={`px-6 py-2.5 rounded-xl font-bold transition text-xs flex items-center space-x-1.5 cursor-pointer shadow-md ${
                     isLight
                       ? "bg-[#425B9A] text-white hover:bg-[#334677]"
-                      : "bg-[#1B2CC1] text-white hover:bg-[#1523a0] border border-[#7692FF]/50 shadow-md shadow-[#1B2CC1]/40"
+                      : "bg-[#DFD0B8] text-[#222831] hover:bg-[#cfbe9e] font-black"
                   }`}
                 >
                   <Search className="h-4 w-4" />
@@ -1847,7 +1880,7 @@ export default function RailwayApp() {
                 className={`rounded-2xl p-6 border shadow-xl space-y-4 transition-all ${
                   isLight
                     ? "bg-white border-[#76C0EC]/50 text-[#425B9A]"
-                    : "bg-[#0d1c54]/80 border-[#1B2CC1]/50 text-white shadow-lg shadow-[#091540]"
+                    : "bg-[#393E46]/90 border-[#948979]/30 text-[#DFD0B8] shadow-lg shadow-[#222831]/60"
                 }`}
               >
                 <div className="flex items-center justify-between pb-3 border-b border-dashed border-slate-700/30">
@@ -1860,13 +1893,13 @@ export default function RailwayApp() {
                       <button
                         onClick={() => copyPnrToClipboard(pnrResult.pnr)}
                         className={`px-3 py-1 rounded-xl border text-xs font-bold flex items-center space-x-1 transition cursor-pointer ${
-                          isLight ? "bg-[#76C0EC]/30 border-[#76C0EC] text-[#425B9A]" : "bg-[#1B2CC1]/30 border-[#7692FF] text-[#ABD2FA]"
+                          isLight ? "bg-[#76C0EC]/30 border-[#76C0EC] text-[#425B9A]" : "bg-[#222831] border-[#DFD0B8] text-[#DFD0B8]"
                         }`}
                       >
                         {copiedPnr === pnrResult.pnr ? (
                           <>
-                            <Check className="h-3.5 w-3.5 text-emerald-500" />
-                            <span className="text-emerald-500">Copied!</span>
+                            <Check className="h-3.5 w-3.5 text-emerald-400" />
+                            <span className="text-emerald-400">Copied!</span>
                           </>
                         ) : (
                           <>
@@ -1880,10 +1913,10 @@ export default function RailwayApp() {
                   <span
                     className={`font-mono font-black text-xs px-3 py-1 rounded-full uppercase ${
                       pnrResult.status === "CONFIRMED"
-                        ? "bg-emerald-500/20 text-emerald-500 border border-emerald-500/40"
+                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
                         : pnrResult.status === "HELD"
-                        ? "bg-amber-500/20 text-amber-500 border border-amber-500/40"
-                        : "bg-rose-500/20 text-rose-500 border border-rose-500/40"
+                        ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                        : "bg-rose-500/20 text-rose-400 border border-rose-500/40"
                     }`}
                   >
                     {pnrResult.status}
@@ -1893,19 +1926,19 @@ export default function RailwayApp() {
                 {/* DSA Verification Info */}
                 <div
                   className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
-                    isLight ? "bg-[#FFF6DC] border-[#76C0EC]/40" : "bg-[#091540] border-[#1B2CC1]"
+                    isLight ? "bg-[#FFF6DC] border-[#76C0EC]/40" : "bg-[#222831] border-[#948979]/40"
                   }`}
                 >
-                  <div className="font-bold flex items-center space-x-1.5 text-emerald-500">
+                  <div className="font-bold flex items-center space-x-1.5 text-emerald-400">
                     <ShieldCheck className="h-4 w-4" />
                     <span>DSA Pipeline Verification</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-[11px] opacity-80 pt-1 font-mono">
                     <div>
-                      Bloom Pre-Check: <span className="text-emerald-500 font-bold">PASSED (Positive)</span>
+                      Bloom Pre-Check: <span className="text-emerald-400 font-bold">PASSED (Positive)</span>
                     </div>
                     <div>
-                      Hash Table Lookup: <span className="text-emerald-500 font-bold">O(1) HIT</span>
+                      Hash Table Lookup: <span className="text-emerald-400 font-bold">O(1) HIT</span>
                     </div>
                   </div>
                 </div>
@@ -1919,7 +1952,7 @@ export default function RailwayApp() {
                     <div
                       key={p.id}
                       className={`p-3.5 rounded-xl border flex items-center justify-between text-xs ${
-                        isLight ? "bg-[#FFF6DC]/50 border-[#76C0EC]/40" : "bg-[#091540] border-[#1B2CC1]"
+                        isLight ? "bg-[#FFF6DC]/50 border-[#76C0EC]/40" : "bg-[#222831] border-[#948979]/40"
                       }`}
                     >
                       <div>
@@ -1931,10 +1964,10 @@ export default function RailwayApp() {
                       <span
                         className={`font-mono font-black px-2.5 py-1 rounded text-xs ${
                           p.status === "CNF"
-                            ? "bg-emerald-500/20 text-emerald-500 border border-emerald-500/40"
+                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
                             : p.status === "WL"
-                            ? "bg-amber-500/20 text-amber-500 border border-amber-500/40"
-                            : "bg-rose-500/20 text-rose-500 border border-rose-500/40"
+                            ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                            : "bg-rose-500/20 text-rose-400 border border-rose-500/40"
                         }`}
                       >
                         {p.status === "CNF"
@@ -1970,116 +2003,330 @@ export default function RailwayApp() {
               className={`rounded-2xl p-6 border shadow-xl transition-all ${
                 isLight
                   ? "bg-white border-[#76C0EC]/50 text-[#425B9A]"
-                  : "bg-[#0d1c54]/80 border-[#1B2CC1]/50 text-white shadow-lg shadow-[#091540]"
+                  : "bg-[#393E46]/90 border-[#948979]/30 text-[#DFD0B8] shadow-lg shadow-[#222831]/60"
               }`}
             >
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-4 border-b border-dashed border-slate-700/30 gap-3">
+              {/* Header Bar */}
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between pb-4 border-b border-dashed border-slate-700/30 gap-4">
                 <div>
                   <h3 className="text-base font-black flex items-center space-x-2">
-                    <BarChart3 className={`h-5 w-5 ${isLight ? "text-[#425B9A]" : "text-[#7692FF]"}`} />
+                    <BarChart3 className={`h-5 w-5 ${isLight ? "text-[#425B9A]" : "text-[#DFD0B8]"}`} />
                     <span>Reservation Chart (Custom Merge-Sort Order)</span>
                   </h3>
                   <p
                     className={`text-xs mt-0.5 ${
-                      isLight ? "text-[#425B9A]/80" : "text-[#ABD2FA]/80"
+                      isLight ? "text-[#425B9A]/80" : "text-[#948979]"
                     }`}
                   >
-                    Sorted strictly by: 1. Coach Identifier ASC &rarr; 2. Berth Number ASC using academic Merge Sort.
+                    Sorted strictly by: 1. Coach Identifier ASC &rarr; 2. Berth Number ASC using academic stable Merge Sort.
                   </p>
                 </div>
-                <div className="flex items-center space-x-2">
+
+                {/* Train Run Schedule Selector & Refresh */}
+                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                   <select
                     value={chartRunId}
                     onChange={(e) => handleLoadChart(parseInt(e.target.value))}
-                    className={`text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer ${
+                    className={`text-xs font-bold rounded-xl px-3 py-2 border outline-none cursor-pointer flex-1 md:flex-none ${
                       isLight
                         ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]"
-                        : "bg-[#091540] border-[#1B2CC1] text-white"
+                        : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8] focus:border-[#DFD0B8]"
                     }`}
                   >
                     {trains.flatMap((t) =>
-                      t.runs.map((r: any) => (
-                        <option key={r.run_id} value={r.run_id}>
-                          {t.train_number} - {r.run_date}
-                        </option>
-                      ))
+                      (t.runs || [])
+                        .filter((r: any) => !r.run_date || r.run_date >= todayStr)
+                        .map((r: any) => (
+                          <option key={r.run_id} value={r.run_id}>
+                            {t.train_number} - {t.train_name} ({r.run_date})
+                          </option>
+                        ))
                     )}
                   </select>
                   <button
                     onClick={() => handleLoadChart(chartRunId)}
-                    className={`p-2 rounded-xl border cursor-pointer ${
-                      isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#091540] border-[#1B2CC1] text-[#7692FF]"
+                    disabled={loadingChart}
+                    title="Reload Reservation Chart"
+                    className={`p-2.5 rounded-xl border transition cursor-pointer shrink-0 ${
+                      isLight
+                        ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A] hover:bg-[#76C0EC]/20"
+                        : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8] hover:border-[#DFD0B8]"
                     }`}
                   >
-                    <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                    <RefreshCw className={`h-4 w-4 ${loadingChart ? "animate-spin" : ""}`} />
                   </button>
                 </div>
               </div>
 
-              {chartData && (
-                <div className="space-y-4 pt-2">
-                  <div className="flex items-center justify-between text-xs font-bold">
-                    <span>
-                      Train: {chartData.train_name} ({chartData.train_number}) | Run Date: {chartData.run_date}
-                    </span>
-                    <span className="font-mono text-[10px] text-emerald-500">
-                      Custom Academic Stable Merge Sort (Time: O(N log N), Space: O(N))
-                    </span>
-                  </div>
-
-                  <div className="overflow-x-auto rounded-xl border border-slate-700/40">
-                    <table className="w-full text-left text-xs">
-                      <thead
-                        className={`font-black uppercase tracking-wider text-[11px] ${
-                          isLight ? "bg-[#FFF6DC] text-[#425B9A]" : "bg-[#091540] text-[#ABD2FA]"
-                        }`}
-                      >
-                        <tr>
-                          <th className="p-3">Coach</th>
-                          <th className="p-3">Berth No</th>
-                          <th className="p-3">Type</th>
-                          <th className="p-3">Status</th>
-                          <th className="p-3">Passenger Name</th>
-                          <th className="p-3">Age / Gender</th>
-                          <th className="p-3">Quota</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-700/20 font-bold">
-                        {chartData.chart?.map((row: any, i: number) => (
-                          <tr
-                            key={i}
-                            className={`transition hover:bg-slate-500/10 ${
-                              isLight ? "text-[#425B9A]" : "text-slate-200"
-                            }`}
-                          >
-                            <td className="p-3 font-mono font-black">{row.coach_code}</td>
-                            <td className="p-3 font-mono font-black">{row.berth_number}</td>
-                            <td className="p-3">{row.berth_type}</td>
-                            <td className="p-3">
-                              <span
-                                className={`px-2 py-0.5 rounded font-black text-[10px] ${
-                                  row.status === "AVAILABLE"
-                                    ? "bg-emerald-500/20 text-emerald-500"
-                                    : row.status === "CONFIRMED"
-                                    ? "bg-rose-500/20 text-rose-500"
-                                    : "bg-amber-500/20 text-amber-500"
-                                }`}
-                              >
-                                {row.status}
-                              </span>
-                            </td>
-                            <td className="p-3 font-bold">{row.passenger_name || "VACANT"}</td>
-                            <td className="p-3">
-                              {row.passenger_age ? `${row.passenger_age} / ${row.passenger_gender}` : "-"}
-                            </td>
-                            <td className="p-3">{row.quota || "-"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+              {/* Loading State */}
+              {loadingChart && (
+                <div className="py-16 text-center space-y-3">
+                  <RefreshCw className="h-8 w-8 animate-spin mx-auto text-amber-400" />
+                  <p className="text-sm font-bold opacity-80">
+                    Loading live reservation chart & executing academic merge-sort...
+                  </p>
+                  <p className="text-xs opacity-60">Ordering coaches and berths without database queries.</p>
                 </div>
               )}
+
+              {/* Empty / Not Loaded State */}
+              {!loadingChart && !chartData && (
+                <div className="py-14 text-center space-y-3">
+                  <p className="text-sm font-bold opacity-75">
+                    No chart data loaded yet for the selected train schedule.
+                  </p>
+                  <button
+                    onClick={() => {
+                      const targetRunId =
+                        chartRunId ||
+                        selectedRunId ||
+                        trains[0]?.runs?.find((r: any) => !r.run_date || r.run_date >= todayStr)?.run_id ||
+                        trains[0]?.runs?.[0]?.run_id;
+                      if (targetRunId) handleLoadChart(targetRunId);
+                    }}
+                    className={`px-4 py-2 rounded-xl text-xs font-black border transition cursor-pointer ${
+                      isLight
+                        ? "bg-[#425B9A] text-white border-[#425B9A] hover:bg-[#334677]"
+                        : "bg-[#DFD0B8] text-[#222831] border-[#DFD0B8] hover:bg-[#cfbe9e]"
+                    }`}
+                  >
+                    Load Reservation Chart
+                  </button>
+                </div>
+              )}
+
+              {/* Chart Loaded State */}
+              {!loadingChart && chartData && (() => {
+                const rawRows = chartData.sorted_chart || chartData.chart || [];
+                const confirmedCount = rawRows.filter(
+                  (r: any) => r.status === "CNF" || r.status === "CONFIRMED"
+                ).length;
+                const vacantCount = rawRows.filter(
+                  (r: any) => r.status === "AVAILABLE" || r.passenger_name === "VACANT"
+                ).length;
+                const waitlist = chartData.waiting_list || [];
+
+                const filteredRows = rawRows.filter((row: any) => {
+                  if (!chartSearchQuery.trim()) return true;
+                  const q = chartSearchQuery.toLowerCase().trim();
+                  return (
+                    row.coach_code?.toLowerCase().includes(q) ||
+                    String(row.berth_number).includes(q) ||
+                    row.berth_type?.toLowerCase().includes(q) ||
+                    row.status?.toLowerCase().includes(q) ||
+                    row.passenger_name?.toLowerCase().includes(q) ||
+                    row.quota?.toLowerCase().includes(q)
+                  );
+                });
+
+                return (
+                  <div className="space-y-4 pt-3">
+                    {/* Train Info Banner & Summary Chips */}
+                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 text-xs font-bold pb-2">
+                      <div className="space-y-1">
+                        <div className="text-sm font-black flex items-center space-x-2">
+                          <Train className="h-4 w-4" />
+                          <span>
+                            {chartData.train_name} ({chartData.train_number})
+                          </span>
+                          <span className="opacity-60 font-normal">&bull;</span>
+                          <span className="text-amber-400 font-mono">{chartData.run_date}</span>
+                        </div>
+                        <div className="font-mono text-[11px] text-emerald-400">
+                          {chartData.sorting_algorithm_used || "Custom Academic Stable Merge Sort (O(N log N))"}
+                        </div>
+                      </div>
+
+                      {/* Stat Counters */}
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        <span className="px-2.5 py-1 rounded-lg border border-slate-700/40 bg-slate-800/30 font-bold">
+                          Total Berths: <strong className="text-white">{rawRows.length}</strong>
+                        </span>
+                        <span className="px-2.5 py-1 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-400 font-bold">
+                          Confirmed: <strong>{confirmedCount}</strong>
+                        </span>
+                        <span className="px-2.5 py-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 font-bold">
+                          Vacant: <strong>{vacantCount}</strong>
+                        </span>
+                        <span className="px-2.5 py-1 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-400 font-bold">
+                          Waitlist: <strong>{waitlist.length}</strong>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* In-Chart Search & Filter Bar */}
+                    <div className="flex items-center space-x-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 opacity-60" />
+                        <input
+                          type="text"
+                          value={chartSearchQuery}
+                          onChange={(e) => setChartSearchQuery(e.target.value)}
+                          placeholder="Filter chart by Coach (e.g. A1, B1), Berth No, Passenger name, or Status..."
+                          className={`w-full pl-9 pr-3 py-2 text-xs font-bold rounded-xl border outline-none transition ${
+                            isLight
+                              ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A] placeholder-[#425B9A]/60"
+                              : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8] placeholder-[#948979] focus:border-[#DFD0B8]"
+                          }`}
+                        />
+                      </div>
+                      {chartSearchQuery && (
+                        <button
+                          onClick={() => setChartSearchQuery("")}
+                          className="px-2.5 py-2 text-xs font-bold rounded-xl border border-slate-700/40 hover:bg-slate-700/30 cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Merge-Sorted Berths Table */}
+                    <div className="overflow-x-auto rounded-xl border border-slate-700/40">
+                      <table className="w-full text-left text-xs">
+                        <thead
+                          className={`font-black uppercase tracking-wider text-[11px] ${
+                            isLight ? "bg-[#FFF6DC] text-[#425B9A]" : "bg-[#222831] text-[#DFD0B8]"
+                          }`}
+                        >
+                          <tr>
+                            <th className="p-3">Coach</th>
+                            <th className="p-3">Berth No</th>
+                            <th className="p-3">Type</th>
+                            <th className="p-3">Status</th>
+                            <th className="p-3">Passenger Name</th>
+                            <th className="p-3">Age / Gender</th>
+                            <th className="p-3">Quota</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-700/20 font-bold">
+                          {filteredRows.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="p-6 text-center text-xs opacity-60 font-normal">
+                                {chartSearchQuery
+                                  ? `No berths match filter "${chartSearchQuery}".`
+                                  : "No berths generated for this scheduled run."}
+                              </td>
+                            </tr>
+                          ) : (
+                            filteredRows.map((row: any, i: number) => {
+                              const isVacant =
+                                row.status === "AVAILABLE" ||
+                                row.passenger_name === "VACANT" ||
+                                !row.passenger_name;
+                              const isCnf = row.status === "CNF" || row.status === "CONFIRMED";
+
+                              return (
+                                <tr
+                                  key={i}
+                                  className={`transition hover:bg-slate-500/10 ${
+                                    isLight ? "text-[#425B9A]" : "text-[#DFD0B8]"
+                                  }`}
+                                >
+                                  <td className="p-3 font-mono font-black">
+                                    <span className="px-2 py-0.5 rounded bg-slate-500/10 border border-slate-600/30">
+                                      {row.coach_code}
+                                    </span>{" "}
+                                    <span className="text-[10px] opacity-70">({row.coach_type})</span>
+                                  </td>
+                                  <td className="p-3 font-mono font-black text-sm">#{row.berth_number}</td>
+                                  <td className="p-3">
+                                    <span className="text-[11px] font-semibold">{row.berth_type}</span>
+                                  </td>
+                                  <td className="p-3">
+                                    <span
+                                      className={`px-2 py-0.5 rounded font-black text-[10px] border ${
+                                        isVacant
+                                          ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                                          : isCnf
+                                          ? "bg-rose-500/20 text-rose-400 border-rose-500/40"
+                                          : "bg-amber-500/20 text-amber-400 border-amber-500/40"
+                                      }`}
+                                    >
+                                      {row.status}
+                                    </span>
+                                  </td>
+                                  <td
+                                    className={`p-3 font-bold ${
+                                      isVacant ? "opacity-40 italic font-normal" : ""
+                                    }`}
+                                  >
+                                    {row.passenger_name || "VACANT"}
+                                  </td>
+                                  <td className="p-3">
+                                    {row.age
+                                      ? `${row.age} yrs / ${row.gender || "-"}`
+                                      : row.passenger_age
+                                      ? `${row.passenger_age} yrs / ${row.passenger_gender || "-"}`
+                                      : "-"}
+                                  </td>
+                                  <td className="p-3">
+                                    {row.quota ? (
+                                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-500/20 border border-slate-500/30">
+                                        {row.quota}
+                                      </span>
+                                    ) : (
+                                      "-"
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Waiting List Section (if active) */}
+                    {waitlist.length > 0 && (
+                      <div className="mt-6 pt-4 border-t border-dashed border-slate-700/30 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-black uppercase tracking-wider flex items-center space-x-2 text-amber-400">
+                            <Clock className="h-4 w-4" />
+                            <span>Priority Queue Waiting List ({waitlist.length} in Min-Heap)</span>
+                          </h4>
+                          <span className="text-[10px] font-mono opacity-70">
+                            Custom Academic Priority Queue (Order: Quota Priority &rarr; Timestamp)
+                          </span>
+                        </div>
+                        <div className="overflow-x-auto rounded-xl border border-slate-700/40">
+                          <table className="w-full text-left text-xs">
+                            <thead
+                              className={`font-black uppercase tracking-wider text-[10px] ${
+                                isLight ? "bg-[#FFF6DC] text-[#425B9A]" : "bg-[#222831] text-[#DFD0B8]"
+                              }`}
+                            >
+                              <tr>
+                                <th className="p-2.5">Priority Rank</th>
+                                <th className="p-2.5">PNR</th>
+                                <th className="p-2.5">Passenger ID</th>
+                                <th className="p-2.5">Quota</th>
+                                <th className="p-2.5">Age</th>
+                                <th className="p-2.5">Enqueue Timestamp</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-700/20 font-bold">
+                              {waitlist.map((w: any, idx: number) => (
+                                <tr key={idx} className="hover:bg-slate-500/10">
+                                  <td className="p-2.5 font-mono text-amber-400">#{idx + 1}</td>
+                                  <td className="p-2.5 font-mono font-black">{w.pnr}</td>
+                                  <td className="p-2.5 font-mono">{w.passenger_id}</td>
+                                  <td className="p-2.5">
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                                      {w.quota}
+                                    </span>
+                                  </td>
+                                  <td className="p-2.5">{w.age || "-"}</td>
+                                  <td className="p-2.5 font-mono text-[10px] opacity-75">{w.timestamp}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}
@@ -2090,12 +2337,12 @@ export default function RailwayApp() {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-base font-black flex items-center space-x-2">
-                  <Database className={`h-5 w-5 ${isLight ? "text-[#425B9A]" : "text-[#7692FF]"}`} />
+                  <Database className={`h-5 w-5 ${isLight ? "text-[#425B9A]" : "text-[#DFD0B8]"}`} />
                   <span>Custom DSA Structural Diagnostics</span>
                 </h3>
                 <p
                   className={`text-xs mt-0.5 ${
-                    isLight ? "text-[#425B9A]/80" : "text-[#ABD2FA]/80"
+                    isLight ? "text-[#425B9A]/80" : "text-[#948979]"
                   }`}
                 >
                   Live metrics proving custom application implementations (Zero DB indexing/sorting).
@@ -2104,7 +2351,7 @@ export default function RailwayApp() {
               <button
                 onClick={loadDSAMetrics}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center space-x-1.5 cursor-pointer ${
-                  isLight ? "bg-white border-[#76C0EC] text-[#425B9A]" : "bg-[#0d1c54] border-[#1B2CC1] text-white"
+                  isLight ? "bg-white border-[#76C0EC] text-[#425B9A]" : "bg-[#393E46] border-[#948979]/40 text-[#DFD0B8] hover:border-[#DFD0B8]"
                 }`}
               >
                 <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
@@ -2119,12 +2366,12 @@ export default function RailwayApp() {
                   className={`rounded-2xl p-6 border shadow-xl space-y-4 transition-all ${
                     isLight
                       ? "bg-white border-[#76C0EC]/50 text-[#425B9A]"
-                      : "bg-[#0d1c54]/80 border-[#1B2CC1]/50 text-white shadow-lg shadow-[#091540]"
+                      : "bg-[#393E46]/90 border-[#948979]/30 text-[#DFD0B8] shadow-lg shadow-[#222831]/60"
                   }`}
                 >
                   <div className="flex items-center justify-between border-b border-dashed border-slate-700/30 pb-3">
                     <h4 className="text-sm font-black">1. Custom PNR Hash Table (Separate Chaining)</h4>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/20 text-[#7692FF] border border-indigo-500/30 font-bold">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#222831] text-[#DFD0B8] border border-[#948979]/50 font-bold">
                       Polynomial Rolling Hash
                     </span>
                   </div>
@@ -2132,7 +2379,7 @@ export default function RailwayApp() {
                   <div className="grid grid-cols-2 gap-4">
                     <div
                       className={`p-3.5 rounded-xl border ${
-                        isLight ? "bg-[#FFF6DC]/60 border-[#76C0EC]/40" : "bg-[#091540] border-[#1B2CC1]"
+                        isLight ? "bg-[#FFF6DC]/60 border-[#76C0EC]/40" : "bg-[#222831] border-[#948979]/40"
                       }`}
                     >
                       <span className="text-[10px] opacity-75 font-bold block">Total Inserted Elements</span>
@@ -2140,7 +2387,7 @@ export default function RailwayApp() {
                     </div>
                     <div
                       className={`p-3.5 rounded-xl border ${
-                        isLight ? "bg-[#FFF6DC]/60 border-[#76C0EC]/40" : "bg-[#091540] border-[#1B2CC1]"
+                        isLight ? "bg-[#FFF6DC]/60 border-[#76C0EC]/40" : "bg-[#222831] border-[#948979]/40"
                       }`}
                     >
                       <span className="text-[10px] opacity-75 font-bold block">Bucket Capacity (M)</span>
@@ -2148,22 +2395,22 @@ export default function RailwayApp() {
                     </div>
                     <div
                       className={`p-3.5 rounded-xl border ${
-                        isLight ? "bg-[#FFF6DC]/60 border-[#76C0EC]/40" : "bg-[#091540] border-[#1B2CC1]"
+                        isLight ? "bg-[#FFF6DC]/60 border-[#76C0EC]/40" : "bg-[#222831] border-[#948979]/40"
                       }`}
                     >
                       <span className="text-[10px] opacity-75 font-bold block">Current Load Factor (&alpha;)</span>
-                      <span className="text-xl font-mono font-black text-indigo-400">
+                      <span className="text-xl font-mono font-black text-[#DFD0B8]">
                         {dsaMetrics.hash_table.load_factor}
                       </span>
                       <span className="text-[9px] opacity-60 block">Resizes at &ge; 0.75</span>
                     </div>
                     <div
                       className={`p-3.5 rounded-xl border ${
-                        isLight ? "bg-[#FFF6DC]/60 border-[#76C0EC]/40" : "bg-[#091540] border-[#1B2CC1]"
+                        isLight ? "bg-[#FFF6DC]/60 border-[#76C0EC]/40" : "bg-[#222831] border-[#948979]/40"
                       }`}
                     >
                       <span className="text-[10px] opacity-75 font-bold block">Total Collisions Handled</span>
-                      <span className="text-xl font-mono font-black text-amber-500">
+                      <span className="text-xl font-mono font-black text-amber-400">
                         {dsaMetrics.hash_table.collision_count}
                       </span>
                     </div>
@@ -2183,12 +2430,12 @@ export default function RailwayApp() {
                   className={`rounded-2xl p-6 border shadow-xl space-y-4 transition-all ${
                     isLight
                       ? "bg-white border-[#76C0EC]/50 text-[#425B9A]"
-                      : "bg-[#0d1c54]/80 border-[#1B2CC1]/50 text-white shadow-lg shadow-[#091540]"
+                      : "bg-[#393E46]/90 border-[#948979]/30 text-[#DFD0B8] shadow-lg shadow-[#222831]/60"
                   }`}
                 >
                   <div className="flex items-center justify-between border-b border-dashed border-slate-700/30 pb-3">
                     <h4 className="text-sm font-black">2. Probabilistic Bloom Filter Pre-Checker</h4>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/20 text-[#7692FF] border border-indigo-500/30 font-bold">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#222831] text-[#DFD0B8] border border-[#948979]/50 font-bold">
                       Kirsch-Mitzenmacher
                     </span>
                   </div>
@@ -2196,7 +2443,7 @@ export default function RailwayApp() {
                   <div className="grid grid-cols-2 gap-4">
                     <div
                       className={`p-3.5 rounded-xl border ${
-                        isLight ? "bg-[#FFF6DC]/60 border-[#76C0EC]/40" : "bg-[#091540] border-[#1B2CC1]"
+                        isLight ? "bg-[#FFF6DC]/60 border-[#76C0EC]/40" : "bg-[#222831] border-[#948979]/40"
                       }`}
                     >
                       <span className="text-[10px] opacity-75 font-bold block">Bit Array Size (m)</span>
@@ -2204,7 +2451,7 @@ export default function RailwayApp() {
                     </div>
                     <div
                       className={`p-3.5 rounded-xl border ${
-                        isLight ? "bg-[#FFF6DC]/60 border-[#76C0EC]/40" : "bg-[#091540] border-[#1B2CC1]"
+                        isLight ? "bg-[#FFF6DC]/60 border-[#76C0EC]/40" : "bg-[#222831] border-[#948979]/40"
                       }`}
                     >
                       <span className="text-[10px] opacity-75 font-bold block">Hash Functions (k)</span>
@@ -2212,7 +2459,7 @@ export default function RailwayApp() {
                     </div>
                     <div
                       className={`p-3.5 rounded-xl border ${
-                        isLight ? "bg-[#FFF6DC]/60 border-[#76C0EC]/40" : "bg-[#091540] border-[#1B2CC1]"
+                        isLight ? "bg-[#FFF6DC]/60 border-[#76C0EC]/40" : "bg-[#222831] border-[#948979]/40"
                       }`}
                     >
                       <span className="text-[10px] opacity-75 font-bold block">Bits Currently Set</span>
@@ -2222,11 +2469,11 @@ export default function RailwayApp() {
                     </div>
                     <div
                       className={`p-3.5 rounded-xl border ${
-                        isLight ? "bg-[#FFF6DC]/60 border-[#76C0EC]/40" : "bg-[#091540] border-[#1B2CC1]"
+                        isLight ? "bg-[#FFF6DC]/60 border-[#76C0EC]/40" : "bg-[#222831] border-[#948979]/40"
                       }`}
                     >
                       <span className="text-[10px] opacity-75 font-bold block">Theoretical False Pos Rate</span>
-                      <span className="text-xl font-mono font-black text-indigo-400">
+                      <span className="text-xl font-mono font-black text-[#DFD0B8]">
                         {dsaMetrics.bloom_filter.false_positive_rate}
                       </span>
                     </div>
@@ -2254,11 +2501,11 @@ export default function RailwayApp() {
                   className={`rounded-2xl p-6 border shadow-xl transition-all space-y-4 ${
                     isLight
                       ? "bg-white border-[#76C0EC]/50 text-[#425B9A]"
-                      : "bg-[#0d1c54]/80 border-[#1B2CC1]/50 text-white shadow-lg shadow-[#091540]"
+                      : "bg-[#393E46]/90 border-[#948979]/30 text-[#DFD0B8] shadow-lg shadow-[#222831]/60"
                   }`}
                 >
                   <div className="flex items-center space-x-2.5 pb-3 border-b border-dashed border-slate-700/30">
-                    <Plus className="h-5 w-5 text-[#7692FF]" />
+                    <Plus className="h-5 w-5 text-[#DFD0B8]" />
                     <h3 className="text-sm font-black">Register New Train &amp; Schedule</h3>
                   </div>
 
@@ -2271,7 +2518,7 @@ export default function RailwayApp() {
                         value={adminTrainNumber}
                         onChange={(e) => setAdminTrainNumber(e.target.value)}
                         className={`w-full rounded-xl px-3 py-2 text-xs font-bold outline-none border transition ${
-                          isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#091540] border-[#1B2CC1] text-white"
+                          isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8]"
                         }`}
                       />
                     </div>
@@ -2283,7 +2530,7 @@ export default function RailwayApp() {
                         value={adminTrainName}
                         onChange={(e) => setAdminTrainName(e.target.value)}
                         className={`w-full rounded-xl px-3 py-2 text-xs font-bold outline-none border transition ${
-                          isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#091540] border-[#1B2CC1] text-white"
+                          isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8]"
                         }`}
                       />
                     </div>
@@ -2296,7 +2543,7 @@ export default function RailwayApp() {
                           value={adminSource}
                           onChange={(e) => setAdminSource(e.target.value)}
                           className={`w-full rounded-xl px-3 py-2 text-xs font-bold outline-none border transition ${
-                            isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#091540] border-[#1B2CC1] text-white"
+                            isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8]"
                           }`}
                         />
                       </div>
@@ -2308,7 +2555,7 @@ export default function RailwayApp() {
                           value={adminDestination}
                           onChange={(e) => setAdminDestination(e.target.value)}
                           className={`w-full rounded-xl px-3 py-2 text-xs font-bold outline-none border transition ${
-                            isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#091540] border-[#1B2CC1] text-white"
+                            isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8]"
                           }`}
                         />
                       </div>
@@ -2322,7 +2569,7 @@ export default function RailwayApp() {
                         value={adminRunDates}
                         onChange={(e) => setAdminRunDates(e.target.value)}
                         className={`w-full rounded-xl px-3 py-2 text-xs font-mono font-bold outline-none border transition ${
-                          isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#091540] border-[#1B2CC1] text-white"
+                          isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8]"
                         }`}
                       />
                     </div>
@@ -2332,7 +2579,7 @@ export default function RailwayApp() {
                         value={adminCoachPreset}
                         onChange={(e) => setAdminCoachPreset(e.target.value)}
                         className={`w-full rounded-xl px-3 py-2 text-xs font-bold outline-none border transition cursor-pointer ${
-                          isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#091540] border-[#1B2CC1] text-white"
+                          isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8]"
                         }`}
                       >
                         <option value="standard">Standard Fleet (A1 2AC, B1 3AC, S1 Sleeper = 36 Berths)</option>
@@ -2346,7 +2593,7 @@ export default function RailwayApp() {
                       className={`w-full py-2.5 rounded-xl font-bold transition text-xs flex items-center justify-center space-x-1.5 cursor-pointer shadow-md ${
                         isLight
                           ? "bg-[#425B9A] text-white hover:bg-[#334677]"
-                          : "bg-[#1B2CC1] text-white hover:bg-[#1523a0] border border-[#7692FF]/50"
+                          : "bg-[#DFD0B8] text-[#222831] hover:bg-[#cfbe9e] font-black"
                       }`}
                     >
                       <Plus className="h-4 w-4" />
@@ -2362,7 +2609,7 @@ export default function RailwayApp() {
                   className={`rounded-2xl p-6 border shadow-xl transition-all space-y-3 ${
                     isLight
                       ? "bg-white border-[#76C0EC]/50 text-[#425B9A]"
-                      : "bg-[#0d1c54]/80 border-[#1B2CC1]/50 text-white shadow-lg shadow-[#091540]"
+                      : "bg-[#393E46]/90 border-[#948979]/30 text-[#DFD0B8] shadow-lg shadow-[#222831]/60"
                   }`}
                 >
                   <div className="flex items-center justify-between pb-3 border-b border-dashed border-slate-700/30">
@@ -2370,7 +2617,7 @@ export default function RailwayApp() {
                     <button
                       onClick={loadTrains}
                       className={`p-1.5 rounded-lg border cursor-pointer ${
-                        isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#091540] border-[#1B2CC1] text-[#7692FF]"
+                        isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8]"
                       }`}
                     >
                       <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} />
@@ -2382,14 +2629,14 @@ export default function RailwayApp() {
                       <div
                         key={t.id}
                         className={`p-3.5 rounded-xl border flex items-center justify-between transition ${
-                          isLight ? "bg-[#FFF6DC]/50 border-[#76C0EC]/40" : "bg-[#091540] border-[#1B2CC1]/60"
+                          isLight ? "bg-[#FFF6DC]/50 border-[#76C0EC]/40" : "bg-[#222831] border-[#948979]/40"
                         }`}
                       >
                         <div className="space-y-0.5">
                           <div className="flex items-center space-x-2">
                             <span
                               className={`font-mono text-xs font-black px-2 py-0.5 rounded ${
-                                isLight ? "bg-[#425B9A] text-white" : "bg-[#1B2CC1] text-[#ABD2FA]"
+                                isLight ? "bg-[#425B9A] text-white" : "bg-[#393E46] text-[#DFD0B8] border border-[#948979]/40"
                               }`}
                             >
                               {t.train_number}
@@ -2404,7 +2651,7 @@ export default function RailwayApp() {
                         <button
                           onClick={() => handleDeleteTrain(t.id, t.train_number, t.train_name)}
                           disabled={adminDeletingId === t.id}
-                          className="px-2.5 py-1.5 rounded-lg text-rose-500 hover:text-rose-400 hover:bg-rose-950/40 transition text-xs flex items-center space-x-1 cursor-pointer border border-rose-900/50"
+                          className="px-2.5 py-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 transition text-xs flex items-center space-x-1 cursor-pointer border border-rose-900/50"
                         >
                           <Trash2 className="h-3 w-3" />
                           <span>Delete</span>
@@ -2431,13 +2678,15 @@ export default function RailwayApp() {
                 ? "bg-rose-950/95 border-rose-700 text-rose-100"
                 : toast.type === "warning"
                 ? "bg-amber-950/95 border-amber-700 text-amber-100"
-                : "bg-slate-900/95 border-[#1B2CC1] text-slate-100"
+                : isLight
+                ? "bg-white border-[#76C0EC] text-[#425B9A]"
+                : "bg-[#222831] border-[#DFD0B8] text-[#DFD0B8]"
             }`}
           >
             {toast.type === "success" && <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />}
             {toast.type === "error" && <AlertTriangle className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />}
             {toast.type === "warning" && <AlertTriangle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />}
-            {toast.type === "info" && <Info className="h-5 w-5 text-[#7692FF] shrink-0 mt-0.5" />}
+            {toast.type === "info" && <Info className="h-5 w-5 text-[#DFD0B8] shrink-0 mt-0.5" />}
             <div className="flex-1">
               <h5 className="text-xs font-bold">{toast.title}</h5>
               <p className="text-[11px] opacity-80 mt-0.5">{toast.message}</p>
