@@ -10,6 +10,8 @@ import {
   lookupPNR,
   fetchReservationChart,
   fetchDSAMetrics,
+  createTrain,
+  deleteTrain,
 } from "@/lib/api";
 import {
   Train,
@@ -31,10 +33,12 @@ import {
   Info,
   Sparkles,
   UserPlus,
+  Plus,
+  Lock,
 } from "lucide-react";
 
 export default function RailwayApp() {
-  const [activeTab, setActiveTab] = useState<"search" | "pnr" | "chart" | "dsa">("search");
+  const [activeTab, setActiveTab] = useState<"search" | "pnr" | "chart" | "dsa" | "admin">("search");
   const [trains, setTrains] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +86,16 @@ export default function RailwayApp() {
 
   // DSA Metrics State
   const [dsaMetrics, setDsaMetrics] = useState<any>(null);
+
+  // Admin Panel States
+  const [adminTrainNumber, setAdminTrainNumber] = useState("");
+  const [adminTrainName, setAdminTrainName] = useState("");
+  const [adminSource, setAdminSource] = useState("");
+  const [adminDestination, setAdminDestination] = useState("");
+  const [adminRunDates, setAdminRunDates] = useState("2026-11-12, 2026-11-13, 2026-11-14");
+  const [adminCoachPreset, setAdminCoachPreset] = useState("standard");
+  const [adminCreating, setAdminCreating] = useState(false);
+  const [adminDeletingId, setAdminDeletingId] = useState<number | null>(null);
 
   const loadLayout = async (runId: number) => {
     try {
@@ -317,6 +331,80 @@ export default function RailwayApp() {
     }
   };
 
+  const handleCreateTrain = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminTrainNumber.trim() || !adminTrainName.trim()) {
+      notify("warning", "Missing Information", "Please enter train number and name.");
+      return;
+    }
+    const dates = adminRunDates.split(",").map((d) => d.trim()).filter(Boolean);
+    if (dates.length === 0) {
+      notify("warning", "Missing Dates", "Please enter at least one run date (YYYY-MM-DD).");
+      return;
+    }
+
+    let coaches = [
+      { coach_code: "A1", coach_type: "2AC", total_berths: 8 },
+      { coach_code: "B1", coach_type: "3AC", total_berths: 12 },
+      { coach_code: "S1", coach_type: "SL", total_berths: 16 },
+    ];
+    if (adminCoachPreset === "high_cap") {
+      coaches = [
+        { coach_code: "A1", coach_type: "2AC", total_berths: 12 },
+        { coach_code: "B1", coach_type: "3AC", total_berths: 16 },
+        { coach_code: "B2", coach_type: "3AC", total_berths: 16 },
+        { coach_code: "S1", coach_type: "SL", total_berths: 24 },
+      ];
+    } else if (adminCoachPreset === "compact") {
+      coaches = [
+        { coach_code: "A1", coach_type: "2AC", total_berths: 8 },
+        { coach_code: "S1", coach_type: "SL", total_berths: 16 },
+      ];
+    }
+
+    setAdminCreating(true);
+    try {
+      const res = await createTrain({
+        train_number: adminTrainNumber.trim(),
+        train_name: adminTrainName.trim(),
+        source_station: adminSource.trim() || "New Delhi (NDLS)",
+        destination_station: adminDestination.trim() || "Howrah (HWH)",
+        run_dates: dates,
+        coaches,
+      });
+      notify(
+        "success",
+        "Train Created!",
+        `Train ${res.train_number} - ${res.train_name} provisioned with ${res.runs_created} scheduled runs.`
+      );
+      setAdminTrainNumber("");
+      setAdminTrainName("");
+      setAdminSource("");
+      setAdminDestination("");
+      await loadTrains();
+    } catch (err: any) {
+      notify("error", "Creation Failed", err.message || "Failed to create train.");
+    } finally {
+      setAdminCreating(false);
+    }
+  };
+
+  const handleDeleteTrain = async (trainId: number, trainNumber: string) => {
+    if (!window.confirm(`Are you sure you want to delete train ${trainNumber} and all its runs?`)) {
+      return;
+    }
+    setAdminDeletingId(trainId);
+    try {
+      await deleteTrain(trainId);
+      notify("info", "Train Deleted", `Train ${trainNumber} has been removed.`);
+      await loadTrains();
+    } catch (err: any) {
+      notify("error", "Deletion Failed", err.message || "Failed to delete train.");
+    } finally {
+      setAdminDeletingId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       {/* Top Header */}
@@ -388,6 +476,17 @@ export default function RailwayApp() {
           >
             <Database className="h-4 w-4" />
             <span>DSA Diagnostics</span>
+          </button>
+          <button
+            onClick={() => setActiveTab("admin")}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition flex items-center space-x-2 ${
+              activeTab === "admin"
+                ? "bg-indigo-600 text-white shadow"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <ShieldCheck className="h-4 w-4" />
+            <span>Admin Portal</span>
           </button>
         </nav>
       </header>
@@ -577,125 +676,186 @@ export default function RailwayApp() {
 
               {/* Passenger Booking Entry & Hold Status */}
               {!holdResult && !bookingConfirmed && (
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                    <div className="flex items-center space-x-2.5">
-                      <div className="p-2 bg-indigo-950/80 border border-indigo-800/60 rounded-xl text-indigo-400">
-                        <Users className="h-4 w-4" />
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+                  <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2.5 bg-indigo-950/80 border border-indigo-700/60 rounded-xl text-indigo-400 shadow-inner">
+                        <Users className="h-5 w-5" />
                       </div>
                       <div>
-                        <h3 className="text-sm font-bold text-white tracking-wide">Passenger Details</h3>
-                        <p className="text-[11px] text-slate-400">Specify passenger details and preferred berths (Max 4)</p>
+                        <div className="flex items-center space-x-2">
+                          <h3 className="text-base font-bold text-white tracking-wide">Passenger Details</h3>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-950 text-indigo-300 border border-indigo-800">
+                            Quota: {quota}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Enter passenger details as per official government identification (Max 4 per PNR)
+                        </p>
                       </div>
                     </div>
                     <button
                       onClick={handleAddPassenger}
                       disabled={passengers.length >= 4}
-                      className="px-3.5 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/50 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold rounded-xl text-indigo-300 transition flex items-center space-x-1.5 shadow-sm"
+                      className="px-3.5 py-2 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/50 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold rounded-xl text-indigo-300 transition flex items-center space-x-1.5 shadow-sm"
                     >
                       <UserPlus className="h-3.5 w-3.5" />
                       <span>Add Passenger ({passengers.length}/4)</span>
                     </button>
                   </div>
 
+                  {/* Passenger Cards */}
                   <div className="space-y-3.5">
-                    {passengers.map((p, idx) => (
-                      <div
-                        key={idx}
-                        className="p-4 bg-slate-950/60 border border-slate-800 hover:border-slate-700/80 rounded-2xl transition space-y-3"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-indigo-300 flex items-center space-x-2">
-                            <span className="w-5 h-5 rounded-full bg-indigo-950 border border-indigo-700/80 flex items-center justify-center text-[10px] font-bold text-indigo-300">
-                              {idx + 1}
-                            </span>
-                            <span>Passenger #{idx + 1}</span>
-                          </span>
-                          {passengers.length > 1 && (
-                            <button
-                              onClick={() => handleRemovePassenger(idx)}
-                              className="text-slate-500 hover:text-rose-400 p-1 rounded-lg hover:bg-rose-950/30 transition text-xs flex items-center space-x-1"
-                              title="Remove passenger"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              <span className="text-[11px]">Remove</span>
-                            </button>
-                          )}
-                        </div>
+                    {passengers.map((p, idx) => {
+                      const isSenior = p.age >= 60;
+                      return (
+                        <div
+                          key={idx}
+                          className="p-4 bg-slate-950/70 border border-slate-800 hover:border-slate-700 rounded-2xl transition shadow-sm space-y-3"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2.5">
+                              <span className="w-6 h-6 rounded-full bg-indigo-950 border border-indigo-600/70 flex items-center justify-center text-xs font-bold text-indigo-300">
+                                {idx + 1}
+                              </span>
+                              <span className="text-xs font-bold text-slate-200">
+                                {idx === 0 ? "Primary Passenger (Adult)" : `Passenger #${idx + 1}`}
+                              </span>
+                              {isSenior && (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800 flex items-center space-x-1">
+                                  <span>✓ Senior Citizen (SS Priority)</span>
+                                </span>
+                              )}
+                              {p.gender === "F" && quota === "LD" && (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-950/80 text-purple-400 border border-purple-800">
+                                  Ladies Quota Applied
+                                </span>
+                              )}
+                            </div>
+                            {passengers.length > 1 && (
+                              <button
+                                onClick={() => handleRemovePassenger(idx)}
+                                className="text-slate-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-950/30 transition text-xs flex items-center space-x-1"
+                                title="Remove passenger"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                <span className="text-[11px]">Remove</span>
+                              </button>
+                            )}
+                          </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                          <div className="sm:col-span-5">
-                            <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                              Full Name (as per Govt ID)
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="e.g. Rahul Sharma"
-                              value={p.name}
-                              onChange={(e) => handlePassengerChange(idx, "name", e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 transition outline-none"
-                            />
-                          </div>
-                          <div className="sm:col-span-2">
-                            <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                              Age
-                            </label>
-                            <input
-                              type="number"
-                              min={1}
-                              max={120}
-                              placeholder="Age"
-                              value={p.age}
-                              onChange={(e) =>
-                                handlePassengerChange(idx, "age", parseInt(e.target.value) || 0)
-                              }
-                              className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-3 py-2 text-xs text-white transition outline-none"
-                            />
-                          </div>
-                          <div className="sm:col-span-2">
-                            <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                              Gender
-                            </label>
-                            <select
-                              value={p.gender}
-                              onChange={(e) => handlePassengerChange(idx, "gender", e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-2.5 py-2 text-xs text-white transition outline-none cursor-pointer"
-                            >
-                              <option value="M">Male</option>
-                              <option value="F">Female</option>
-                              <option value="O">Other</option>
-                            </select>
-                          </div>
-                          <div className="sm:col-span-3">
-                            <label className="block text-[11px] font-medium text-slate-400 mb-1">
-                              Berth Preference
-                            </label>
-                            <select
-                              value={p.berth_preference}
-                              onChange={(e) =>
-                                handlePassengerChange(idx, "berth_preference", e.target.value)
-                              }
-                              className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-2.5 py-2 text-xs text-white transition outline-none cursor-pointer"
-                            >
-                              <option value="LOWER">Lower Berth</option>
-                              <option value="MIDDLE">Middle Berth</option>
-                              <option value="UPPER">Upper Berth</option>
-                              <option value="SIDE_LOWER">Side Lower</option>
-                            </select>
+                          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5 pt-1">
+                            {/* Full Name */}
+                            <div className="sm:col-span-5">
+                              <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
+                                Full Name (Govt ID)
+                              </label>
+                              <input
+                                type="text"
+                                placeholder="e.g. Rahul Sharma"
+                                value={p.name}
+                                onChange={(e) => handlePassengerChange(idx, "name", e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 transition outline-none"
+                              />
+                            </div>
+
+                            {/* Age */}
+                            <div className="sm:col-span-2">
+                              <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
+                                Age (Yrs)
+                              </label>
+                              <input
+                                type="number"
+                                min={1}
+                                max={120}
+                                placeholder="30"
+                                value={p.age}
+                                onChange={(e) =>
+                                  handlePassengerChange(idx, "age", parseInt(e.target.value) || 0)
+                                }
+                                className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-3 py-2 text-xs text-white transition outline-none font-mono"
+                              />
+                            </div>
+
+                            {/* Gender */}
+                            <div className="sm:col-span-2">
+                              <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
+                                Gender
+                              </label>
+                              <select
+                                value={p.gender}
+                                onChange={(e) => handlePassengerChange(idx, "gender", e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-2.5 py-2 text-xs text-white transition outline-none cursor-pointer"
+                              >
+                                <option value="M">Male</option>
+                                <option value="F">Female</option>
+                                <option value="O">Other</option>
+                              </select>
+                            </div>
+
+                            {/* Berth Preference */}
+                            <div className="sm:col-span-3">
+                              <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
+                                Berth Preference
+                              </label>
+                              <select
+                                value={p.berth_preference}
+                                onChange={(e) =>
+                                  handlePassengerChange(idx, "berth_preference", e.target.value)
+                                }
+                                className="w-full bg-slate-900 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl px-2.5 py-2 text-xs text-white transition outline-none cursor-pointer"
+                              >
+                                <option value="NO_PREF">No Preference</option>
+                                <option value="LOWER">Lower Berth</option>
+                                <option value="MIDDLE">Middle Berth</option>
+                                <option value="UPPER">Upper Berth</option>
+                                <option value="SIDE_LOWER">Side Lower</option>
+                                <option value="SIDE_UPPER">Side Upper</option>
+                              </select>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
-                  <button
-                    onClick={handleHoldBooking}
-                    disabled={loading}
-                    className="w-full mt-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl shadow-lg shadow-indigo-600/20 transition text-sm flex items-center justify-center space-x-2 cursor-pointer"
-                  >
-                    <span>Request Temporary Berth Hold (5 Min TTL)</span>
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
+                  {/* Summary & Pricing Bar */}
+                  <div className="p-4 bg-slate-950/80 border border-slate-800/80 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center space-x-4">
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Total Fare</span>
+                        <div className="text-lg font-bold text-emerald-400">
+                          ₹{500 * passengers.length}{" "}
+                          <span className="text-xs font-normal text-slate-400">
+                            ({passengers.length} × ₹500 base)
+                          </span>
+                        </div>
+                      </div>
+                      <div className="h-8 w-px bg-slate-800 hidden sm:block"></div>
+                      <div className="hidden sm:block">
+                        <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Allocated Policy</span>
+                        <span className="text-xs text-slate-300 font-medium">
+                          {quota === "SS"
+                            ? "Priority 1 (Senior Citizen Min-Heap)"
+                            : quota === "LD"
+                            ? "Priority 2 (Ladies Quota Min-Heap)"
+                            : quota === "TQ"
+                            ? "Tatkal Dynamic Pool"
+                            : "General First-Come First-Served"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleHoldBooking}
+                      disabled={loading || !selectedRunId}
+                      className="w-full sm:w-auto px-6 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl shadow-lg shadow-indigo-600/20 transition text-xs flex items-center justify-center space-x-2 cursor-pointer"
+                    >
+                      <Lock className="h-3.5 w-3.5" />
+                      <span>Proceed to Seat Hold (5 Min TTL)</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1296,6 +1456,249 @@ export default function RailwayApp() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ===================== TAB 5: ADMIN PORTAL ===================== */}
+        {activeTab === "admin" && (
+          <div className="space-y-6">
+            {/* Admin Header Banner */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-2 bg-indigo-950 border border-indigo-800 rounded-xl text-indigo-400">
+                    <ShieldCheck className="h-5 w-5" />
+                  </div>
+                  <h2 className="text-lg font-bold text-white tracking-wide">
+                    Train & Fleet Administration Portal
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Create new trains, provision coaches with custom berth configurations, and manage scheduled runs in the academic engine.
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={loadTrains}
+                  disabled={loading}
+                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center space-x-2 transition cursor-pointer"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+                  <span>Refresh Fleet ({trains.length} Trains)</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left 5 Cols: Create New Train Form */}
+              <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+                <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                      <Train className="h-4 w-4 text-indigo-400" />
+                      <span>Provision New Train</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Instantiates coaches, runs, and individual berth nodes in SQLite DB
+                    </p>
+                  </div>
+                </div>
+
+                <form onSubmit={handleCreateTrain} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
+                        Train Number
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. 12431"
+                        value={adminTrainNumber}
+                        onChange={(e) => setAdminTrainNumber(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 transition outline-none font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
+                        Train Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Rajdhani Express"
+                        value={adminTrainName}
+                        onChange={(e) => setAdminTrainName(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 transition outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
+                        Source Station
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Hazrat Nizamuddin (NZM)"
+                        value={adminSource}
+                        onChange={(e) => setAdminSource(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 transition outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
+                        Destination Station
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Trivandrum Central (TVC)"
+                        value={adminDestination}
+                        onChange={(e) => setAdminDestination(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 transition outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
+                      Run Dates (Comma-separated YYYY-MM-DD)
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="2026-11-12, 2026-11-13, 2026-11-14"
+                      value={adminRunDates}
+                      onChange={(e) => setAdminRunDates(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 transition outline-none font-mono"
+                    />
+                    <div className="flex items-center space-x-2 mt-2">
+                      <span className="text-[10px] text-slate-500">Quick Fill:</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const today = new Date();
+                          const d1 = new Date(today);
+                          const d2 = new Date(today);
+                          d2.setDate(today.getDate() + 1);
+                          const d3 = new Date(today);
+                          d3.setDate(today.getDate() + 2);
+                          setAdminRunDates(
+                            `${d1.toISOString().split("T")[0]}, ${
+                              d2.toISOString().split("T")[0]
+                            }, ${d3.toISOString().split("T")[0]}`
+                          );
+                        }}
+                        className="text-[10px] text-indigo-400 hover:text-indigo-300 underline cursor-pointer"
+                      >
+                        Today + Next 2 Days
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1.5">
+                      Coach Configuration Preset
+                    </label>
+                    <select
+                      value={adminCoachPreset}
+                      onChange={(e) => setAdminCoachPreset(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs text-white transition outline-none cursor-pointer"
+                    >
+                      <option value="standard">
+                        Standard Fleet (A1: 2AC 8b, B1: 3AC 12b, S1: SL 16b = 36 Berths)
+                      </option>
+                      <option value="high_cap">
+                        High Capacity (A1: 2AC 12b, B1: 3AC 16b, B2: 3AC 16b, S1: SL 24b = 68 Berths)
+                      </option>
+                      <option value="compact">Express Shuttle (A1: 2AC 8b, S1: SL 16b = 24 Berths)</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={adminCreating}
+                    className="w-full py-3 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-50 text-white font-semibold rounded-xl text-xs flex items-center justify-center space-x-2 shadow-lg shadow-indigo-600/20 transition cursor-pointer"
+                  >
+                    {adminCreating ? (
+                      <>
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        <span>Provisioning Train...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>Deploy Train to Reservation Engine</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+
+              {/* Right 7 Cols: Active Fleet List */}
+              <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+                <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center space-x-2">
+                      <Database className="h-4 w-4 text-emerald-400" />
+                      <span>Active Train Fleet ({trains.length})</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Direct management of trains, runs, and berth inventory
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
+                  {trains.map((t) => (
+                    <div
+                      key={t.id}
+                      className="p-4 bg-slate-950/70 border border-slate-800 hover:border-slate-700 rounded-2xl transition space-y-3"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-mono font-bold text-indigo-400 text-sm">
+                              {t.train_number}
+                            </span>
+                            <span className="font-bold text-white text-sm">{t.train_name}</span>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {t.source_station} &rarr; {t.destination_station}
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={() => handleDeleteTrain(t.id, t.train_number)}
+                          disabled={adminDeletingId === t.id}
+                          className="px-3 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/60 text-rose-300 rounded-xl text-xs font-semibold transition flex items-center space-x-1.5 cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>{adminDeletingId === t.id ? "Deleting..." : "Delete"}</span>
+                        </button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-900">
+                        <span className="text-[11px] text-slate-500 mr-1 self-center">Runs:</span>
+                        {t.runs.map((r: any) => (
+                          <span
+                            key={r.run_id}
+                            className="px-2.5 py-1 bg-slate-900 border border-slate-800 rounded-lg text-[11px] font-mono text-slate-300 flex items-center space-x-1.5"
+                          >
+                            <span>{r.run_date}</span>
+                            <span className="text-emerald-400 font-bold">({r.available_berths} avl)</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </main>

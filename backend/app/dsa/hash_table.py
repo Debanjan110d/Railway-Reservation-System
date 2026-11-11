@@ -1,3 +1,4 @@
+import threading
 from typing import Any, Optional, List
 
 class HashNode:
@@ -15,17 +16,22 @@ class PNRHashTable:
         self.max_load_factor = max_load_factor
         self.size = 0
         self.buckets: List[Optional[HashNode]] = [None] * self.capacity
+        self._lock = threading.RLock()
         
         # stats tracked for performance checks
         self.total_collisions = 0
         self.resizes = 0
 
+    def _normalize_key(self, key: str) -> str:
+        return str(key).strip().upper()
+
     def _hash(self, key: str) -> int:
+        norm_key = self._normalize_key(key)
         # standard polynomial rolling hash, prime base 31 works well for alphanumeric PNR
         p = 31
         hash_val = 0
         p_pow = 1
-        for ch in key:
+        for ch in norm_key:
             hash_val = (hash_val + ord(ch) * p_pow) % self.capacity
             p_pow = (p_pow * p) % 1000000007
         return hash_val % self.capacity
@@ -44,18 +50,19 @@ class PNRHashTable:
         for head in old_buckets:
             curr = head
             while curr:
-                self.insert(curr.key, curr.value, resize_check=False)
+                self._insert_internal(curr.key, curr.value, resize_check=False)
                 curr = curr.next
 
-    def insert(self, key: str, value: Any, resize_check: bool = True) -> bool:
+    def _insert_internal(self, key: str, value: Any, resize_check: bool = True) -> bool:
+        norm_key = self._normalize_key(key)
         if resize_check and self.load_factor >= self.max_load_factor:
             self._resize(self.capacity * 2)
 
-        idx = self._hash(key)
+        idx = self._hash(norm_key)
         head = self.buckets[idx]
 
         if not head:
-            self.buckets[idx] = HashNode(key, value)
+            self.buckets[idx] = HashNode(norm_key, value)
             self.size += 1
             return True
 
@@ -64,7 +71,7 @@ class PNRHashTable:
         has_collision = False
 
         while curr:
-            if curr.key == key:
+            if curr.key == norm_key:
                 curr.value = value
                 return False
             prev = curr
@@ -74,60 +81,70 @@ class PNRHashTable:
         if has_collision:
             self.total_collisions += 1
 
-        prev.next = HashNode(key, value)
+        prev.next = HashNode(norm_key, value)
         self.size += 1
         return True
 
+    def insert(self, key: str, value: Any, resize_check: bool = True) -> bool:
+        with self._lock:
+            return self._insert_internal(key, value, resize_check=resize_check)
+
     def search(self, key: str) -> Optional[Any]:
-        idx = self._hash(key)
-        curr = self.buckets[idx]
-        while curr:
-            if curr.key == key:
-                return curr.value
-            curr = curr.next
-        return None
+        with self._lock:
+            norm_key = self._normalize_key(key)
+            idx = self._hash(norm_key)
+            curr = self.buckets[idx]
+            while curr:
+                if curr.key == norm_key:
+                    return curr.value
+                curr = curr.next
+            return None
 
     def delete(self, key: str) -> bool:
-        idx = self._hash(key)
-        curr = self.buckets[idx]
-        prev = None
+        with self._lock:
+            norm_key = self._normalize_key(key)
+            idx = self._hash(norm_key)
+            curr = self.buckets[idx]
+            prev = None
 
-        while curr:
-            if curr.key == key:
-                if prev is None:
-                    self.buckets[idx] = curr.next
-                else:
-                    prev.next = curr.next
-                self.size -= 1
-                return True
-            prev = curr
-            curr = curr.next
+            while curr:
+                if curr.key == norm_key:
+                    if prev is None:
+                        self.buckets[idx] = curr.next
+                    else:
+                        prev.next = curr.next
+                    self.size -= 1
+                    return True
+                prev = curr
+                curr = curr.next
 
-        return False
+            return False
 
     def contains(self, key: str) -> bool:
-        return self.search(key) is not None
+        with self._lock:
+            return self.search(key) is not None
 
     def get_metrics(self) -> dict:
-        bucket_lengths = []
-        occupied_count = 0
-        for head in self.buckets:
-            length = 0
-            curr = head
-            while curr:
-                length += 1
-                curr = curr.next
-            bucket_lengths.append(length)
-            if length > 0:
-                occupied_count += 1
+        with self._lock:
+            bucket_lengths = []
+            occupied_count = 0
+            for head in self.buckets:
+                length = 0
+                curr = head
+                while curr:
+                    length += 1
+                    curr = curr.next
+                bucket_lengths.append(length)
+                if length > 0:
+                    occupied_count += 1
 
-        max_chain = max(bucket_lengths) if bucket_lengths else 0
-        return {
-            "size": self.size,
-            "capacity": self.capacity,
-            "load_factor": round(self.load_factor, 4),
-            "occupied_buckets": occupied_count,
-            "max_chain_length": max_chain,
-            "total_collisions": self.total_collisions,
-            "resizes": self.resizes
-        }
+            max_chain = max(bucket_lengths) if bucket_lengths else 0
+            return {
+                "size": self.size,
+                "capacity": self.capacity,
+                "load_factor": round(self.load_factor, 4),
+                "occupied_buckets": occupied_count,
+                "max_chain_length": max_chain,
+                "total_collisions": self.total_collisions,
+                "resizes": self.resizes
+            }

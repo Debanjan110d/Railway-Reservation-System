@@ -119,3 +119,65 @@ def test_reservation_chart_sorting():
     result = [(item["coach_code"], item["berth_number"]) for item in sorted_chart]
     assert result == expected
 
+
+def test_dsa_casing_resilience():
+    ht = PNRHashTable(initial_capacity=16)
+    bf = BloomFilter(expected_elements=100)
+
+    # Insert with lowercase & mixed case
+    ht.insert("pnr_abc123", {"name": "Test Passenger"})
+    bf.add("pnr_abc123")
+
+    # Search with UPPERCASE
+    assert ht.search("PNR_ABC123") is not None
+    assert ht.search("PNR_ABC123")["name"] == "Test Passenger"
+    assert bf.contains("PNR_ABC123") is True
+
+    # Search with mixed case and whitespace
+    assert ht.search("  pnr_AbC123  ") is not None
+    assert bf.contains("  pnr_AbC123  ") is True
+
+    # Priority Queue quota casing
+    entry = PriorityQueueEntry(1, "p1", "ss", 65, datetime.datetime.now())
+    assert entry.quota == "SS"
+    assert entry.priority_key[0] == 0  # Senior quota highest priority
+
+
+def test_dsa_parallel_processing():
+    import concurrent.futures
+
+    ht = PNRHashTable(initial_capacity=32)
+    bf = BloomFilter(expected_elements=500)
+    pq = PriorityQueue()
+    wq = WaitingQueue()
+
+    def worker_task(thread_id: int):
+        for i in range(50):
+            key = f"THREAD_{thread_id}_PNR_{i}"
+            ht.insert(key, {"tid": thread_id, "idx": i})
+            bf.add(key)
+            pq.push(PriorityQueueEntry(
+                passenger_id=thread_id * 1000 + i,
+                pnr=key,
+                quota="GN",
+                age=20 + (i % 50),
+                timestamp=datetime.datetime.now()
+            ))
+            wq.enqueue(key)
+
+            # Concurrent reads
+            assert ht.search(key) is not None
+            assert bf.contains(key) is True
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        futures = [executor.submit(worker_task, tid) for tid in range(8)]
+        for f in concurrent.futures.as_completed(futures):
+            f.result()
+
+    # 8 threads * 50 = 400 entries inserted concurrently
+    assert ht.size == 400
+    assert len(pq) == 400
+    assert len(wq) == 400
+    assert bf.count == 400
+
+

@@ -36,26 +36,39 @@ For full mathematical proofs, space/time asymptotic bounds, and empirical simula
 
 ---
 
-## 3. Quick Start (Windows Launcher)
+## 3. Quick Start & Multi-Device Launchers
 
-### Launching System (Backend + Frontend)
+### Option A: Localhost Launcher (Windows PowerShell)
 ```powershell
 .\run.ps1
 ```
-The launcher automatically:
-1. Verifies database connectivity and auto-seeds initial trains and coaches.
-2. Starts the FastAPI Backend on `http://127.0.0.1:8000`.
-3. Starts the Next.js Frontend with Turbopack on `http://localhost:3000`.
-4. Initializes dedicated runtime logging into `logs/error.log`.
 
-- **Frontend UI**: [http://localhost:3000](http://localhost:3000)
+### Option B: Local Area Network (LAN) Server (Any Phone, Tablet, or PC on Wi-Fi)
+```bash
+python serve_lan.py
+```
+*Auto-detects your primary Wi-Fi IPv4 address (e.g. `192.168.0.107`) and broadcasts the live web UI so any smartphone or laptop on the same network can access the system at `http://<LAN_IP>:3000`!*
+
+- **Frontend UI**: [http://localhost:3000](http://localhost:3000) (or `http://<LAN_IP>:3000`)
 - **Interactive API Docs**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - **DSA Diagnostics & Live Metrics**: [http://127.0.0.1:8000/api/v1/metrics/dsa](http://127.0.0.1:8000/api/v1/metrics/dsa)
 - **Dedicated Error Log**: `logs/error.log`
 
 ---
 
-## 4. Interactive Demonstration Workflows
+## 4. Academic College Project "Book of Documentation"
+
+A comprehensive 5-chapter academic textbook detailing real-world engineering challenges, custom algorithmic formulations, mathematical proofs, and examiner viva voce prep is stored in [`docs/book_of_docs/`](docs/book_of_docs/README.md):
+
+- [**Chapter 1: Problem Analysis & Real-World Challenges**](docs/book_of_docs/01_PROBLEM_ANALYSIS_AND_CHALLENGES.md) — The *Tatkal* concurrency bottleneck, double-booking race condition, waitlist priority inversion, and SQL lock contention.
+- [**Chapter 2: Custom DSA Formulations & Mathematical Solutions**](docs/book_of_docs/02_CUSTOM_DSA_SOLUTIONS.md) — Polynomial Rolling Hash Table, Kirsch-Mitzenmacher Bloom Filter ($m=95{,}850, k=6$), 4-Tuple Quota Min-Heap, Doubly-Linked Circular RAC Queue, and Stable Merge Sort.
+- [**Chapter 3: Concurrency, Parallel Processing & Normalization**](docs/book_of_docs/03_CONCURRENCY_AND_PARALLEL_PROCESSING.md) — Multi-threaded safety with `threading.RLock`, 2-phase seat holds with 5-minute TTL locks, idempotency tokens, and boundary casing/whitespace normalization.
+- [**Chapter 4: Local Area Network (LAN) & Cross-Device Engineering**](docs/book_of_docs/04_LAN_DEPLOYMENT_AND_CROSS_DEVICE_NETWORKING.md) — Dynamic socket discovery, resolving the mobile loopback trap, and multi-device live testing.
+- [**Chapter 5: Empirical Benchmark Results & College Viva Voce Guide**](docs/book_of_docs/05_EXPERIMENTAL_RESULTS_AND_VIVA_PREP.md) — Mathematical complexity matrix, 1,200-event empirical benchmark logs, and 15 commonly asked professor/examiner viva questions with model answers.
+
+---
+
+## 5. Interactive Demonstration Workflows
 
 ### Demo 1: Booking & Atomic Berth Hold (5 Min TTL)
 1. Navigate to **Search & Book**.
@@ -65,8 +78,8 @@ The launcher automatically:
    - `SS`: Senior Citizen (Priority 1 in waiting heap)
    - `LD`: Ladies Quota (Priority 2 in waiting heap)
    - `TQ`: Tatkal Waitlist
-4. Fill in passenger details and select preferred berths.
-5. Click **Request Temporary Berth Hold (5 Min TTL)**.
+4. Fill in passenger details (with automatic senior-citizen priority detection for age $\ge 60$) and select preferred berths.
+5. Click **Proceed to Seat Hold (5 Min TTL)**.
 6. Observe the real-time countdown timer, held berths in amber, and toast notification.
 7. Click **Simulate Successful Payment** to confirm berths and index PNR into the Bloom Filter and Hash Table.
 
@@ -88,15 +101,23 @@ The launcher automatically:
 2. Select any train run from the dropdown.
 3. Observe all allocated berths stably sorted in $O(N \log N)$ time grouped by `Coach Identifier ASC` followed by `Berth Number ASC`.
 
+### Demo 5: Admin Fleet Management Portal
+1. Navigate to **Admin Portal** tab.
+2. Enter Train Number, Train Name, Route, and Run Dates.
+3. Select coach presets (Standard, High Capacity, or Express Shuttle).
+4. Click **Deploy Train to Reservation Engine** — coaches, runs, and individual berth nodes are instantly populated in database and live in search.
+5. Delete any scheduled train with one click.
+
 ---
 
-## 5. Running Quality Checks Locally
+## 6. Running Quality Checks Locally
 
 ```bash
-# Run full 16-test automated pytest suite
+# Run full 18-test automated pytest suite
 export PYTHONPATH=./backend
 python -m pytest backend/app/tests/ -v
 
-# Run 1,200-event academic simulation benchmark
-python -m backend.app.tests.simulation_runner
+# Run frontend build verification
+cd frontend && npm run build
+```
 ```

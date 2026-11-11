@@ -16,28 +16,29 @@ def get_pnr_status(pnr: str, db: Session = Depends(get_db)):
     2. Custom PNR Hash Table Lookup (O(1) average)
     3. Fallback database verification & state hydration
     """
-    bloom_check = dsa_manager.bloom_filter.contains(pnr)
+    clean_pnr = str(pnr).strip().upper()
+    bloom_check = dsa_manager.bloom_filter.contains(clean_pnr)
     if not bloom_check:
         raise HTTPException(
             status_code=404,
             detail={
-                "message": f"PNR {pnr} definitively absent from system.",
+                "message": f"PNR {clean_pnr} definitively absent from system.",
                 "bloom_filter_pre_check": False,
                 "dsa_optimization": "Fast-path rejection without DB query"
             }
         )
 
     # Search custom hash table
-    ht_entry = dsa_manager.pnr_table.search(pnr)
+    ht_entry = dsa_manager.pnr_table.search(clean_pnr)
 
     # Also retrieve full booking entity for complete details
-    booking = db.query(Booking).filter(Booking.pnr == pnr).first()
+    booking = db.query(Booking).filter(Booking.pnr == clean_pnr).first()
     if not booking:
         # This was a false positive from Bloom filter!
         raise HTTPException(
             status_code=404,
             detail={
-                "message": f"PNR {pnr} not found in database.",
+                "message": f"PNR {clean_pnr} not found in database.",
                 "bloom_filter_pre_check": True,
                 "note": "Probabilistic Bloom Filter produced a false positive (resolved by hash table)."
             }
