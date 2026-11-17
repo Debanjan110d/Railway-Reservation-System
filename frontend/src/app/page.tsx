@@ -620,26 +620,26 @@ export default function RailwayApp() {
     >
       {/* ===================== TOP HEADER & NAVIGATION ===================== */}
       <header
-        className={`sticky top-0 z-50 px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between border-b transition-colors ${
+        className={`sticky top-0 z-50 px-3 sm:px-6 py-2.5 sm:py-3.5 flex flex-wrap items-center justify-between border-b transition-colors ${
           isLight
             ? "bg-white/95 text-[#425B9A] border-[#76C0EC]/50 shadow-md backdrop-blur-md"
             : "bg-[#222831]/95 text-[#DFD0B8] border-[#393E46] shadow-xl backdrop-blur-md"
         }`}
       >
         {/* Brand / Logo */}
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2.5 sm:space-x-3">
           <img
             src="/icon.svg"
             alt="RailDSA Engine Logo"
-            className={`h-10 w-10 rounded-xl p-1 shadow-md transition-transform hover:scale-105 ${
+            className={`h-9 w-9 sm:h-10 sm:w-10 rounded-xl p-1 shadow-md transition-transform hover:scale-105 shrink-0 ${
               isLight ? "bg-[#FFF6DC] border border-[#76C0EC]" : "bg-[#393E46] border border-[#948979]/50"
             }`}
           />
           <div>
             <div className="flex items-center space-x-2">
-              <h1 className="text-lg font-black tracking-tight">RailDSA Engine</h1>
+              <h1 className="text-base sm:text-lg font-black tracking-tight">RailDSA Engine</h1>
               <span
-                className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                className={`text-[9px] sm:text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                   isLight
                     ? "bg-[#FF95A5] text-[#425B9A]"
                     : "bg-[#393E46] text-[#DFD0B8] border border-[#948979]/50"
@@ -649,7 +649,7 @@ export default function RailwayApp() {
               </span>
             </div>
             <p
-              className={`text-[11px] font-medium tracking-wide ${
+              className={`text-[10px] sm:text-[11px] font-medium tracking-wide ${
                 isLight ? "text-[#425B9A]/80" : "text-[#948979]"
               }`}
             >
@@ -659,9 +659,9 @@ export default function RailwayApp() {
         </div>
 
         {/* Navigation Tabs & Theme Toggle */}
-        <div className="flex items-center space-x-2 mt-2 sm:mt-0">
+        <div className="flex items-center space-x-1.5 sm:space-x-2 mt-2 sm:mt-0 overflow-x-auto max-w-full pb-0.5 sm:pb-0">
           <nav
-            className={`flex items-center space-x-1 p-1 rounded-xl border ${
+            className={`flex items-center space-x-1 p-1 rounded-xl border shrink-0 ${
               isLight
                 ? "bg-[#FFF6DC] border-[#76C0EC]/60"
                 : "bg-[#393E46] border-[#948979]/40"
@@ -693,7 +693,7 @@ export default function RailwayApp() {
                     }
                     if (tab.id === "dsa") loadDSAMetrics();
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer ${
+                  className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer shrink-0 ${
                     isActive
                       ? isLight
                         ? "bg-[#425B9A] text-white shadow-md"
@@ -713,7 +713,7 @@ export default function RailwayApp() {
           {/* Theme Toggle Button */}
           <button
             onClick={() => setTheme((prev) => (prev === "dark" ? "light" : "dark"))}
-            className={`p-2 rounded-xl border flex items-center space-x-1.5 text-xs font-bold transition cursor-pointer ${
+            className={`p-2 rounded-xl border flex items-center space-x-1.5 text-xs font-bold transition cursor-pointer shrink-0 ${
               isLight
                 ? "bg-white border-[#76C0EC] text-[#425B9A] hover:bg-[#76C0EC]/20"
                 : "bg-[#393E46] border-[#948979]/50 text-[#DFD0B8] hover:bg-[#948979]/30"
@@ -749,23 +749,23 @@ export default function RailwayApp() {
       )}
 
       {/* Main Content Max Width Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 space-y-5 sm:space-y-6 overflow-x-hidden">
         {/* ===================== TAB 1: SEARCH & BOOK ===================== */}
         {activeTab === "search" && (
-          <div className="space-y-6">
+          <div className="space-y-5 sm:space-y-6">
             {/* 1. Step Progress Bar */}
             <div
-              className={`rounded-2xl p-4 sm:p-5 border shadow-xl transition-all ${
+              className={`rounded-2xl p-3 sm:p-5 border shadow-xl transition-all ${
                 isLight
                   ? "bg-white border-[#76C0EC]/50 shadow-sm"
                   : "bg-[#393E46]/90 border-[#948979]/30 shadow-lg shadow-[#222831]/60"
               }`}
             >
-              <div className="grid grid-cols-3 gap-2 sm:gap-4 items-center">
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-4 items-center">
                 {/* Step 1 */}
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2 sm:space-x-3">
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 transition-colors ${
+                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 transition-colors ${
                       currentStep >= 1
                         ? isLight
                           ? "bg-[#425B9A] text-white ring-2 ring-[#76C0EC]"
@@ -775,22 +775,22 @@ export default function RailwayApp() {
                   >
                     1
                   </div>
-                  <div>
-                    <div className="text-xs font-black">Select Train</div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] sm:text-xs font-black truncate">Select Train</div>
                     <div
-                      className={`text-[10px] hidden sm:block ${
+                      className={`text-[9px] sm:text-[10px] hidden sm:block ${
                         isLight ? "text-[#425B9A]/70" : "text-[#DFD0B8]/70"
                       }`}
                     >
-                      Choose train, date &amp; class
+                      Choose train &amp; class
                     </div>
                   </div>
                 </div>
 
                 {/* Step 2 */}
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2 sm:space-x-3">
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 transition-colors ${
+                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 transition-colors ${
                       currentStep >= 2
                         ? isLight
                           ? "bg-[#425B9A] text-white ring-2 ring-[#76C0EC]"
@@ -802,10 +802,10 @@ export default function RailwayApp() {
                   >
                     2
                   </div>
-                  <div>
-                    <div className="text-xs font-black">Passenger Details</div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] sm:text-xs font-black truncate">Passengers</div>
                     <div
-                      className={`text-[10px] hidden sm:block ${
+                      className={`text-[9px] sm:text-[10px] hidden sm:block ${
                         isLight ? "text-[#425B9A]/70" : "text-[#DFD0B8]/70"
                       }`}
                     >
@@ -815,9 +815,9 @@ export default function RailwayApp() {
                 </div>
 
                 {/* Step 3 */}
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2 sm:space-x-3">
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 transition-colors ${
+                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 transition-colors ${
                       currentStep >= 3
                         ? isLight
                           ? "bg-[#425B9A] text-white ring-2 ring-[#76C0EC]"
@@ -829,14 +829,14 @@ export default function RailwayApp() {
                   >
                     3
                   </div>
-                  <div>
-                    <div className="text-xs font-black">Confirm &amp; Hold</div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] sm:text-xs font-black truncate">Hold &amp; Pay</div>
                     <div
-                      className={`text-[10px] hidden sm:block ${
+                      className={`text-[9px] sm:text-[10px] hidden sm:block ${
                         isLight ? "text-[#425B9A]/70" : "text-[#DFD0B8]/70"
                       }`}
                     >
-                      Review, fare &amp; temporary hold
+                      Review &amp; temporary hold
                     </div>
                   </div>
                 </div>
@@ -881,10 +881,10 @@ export default function RailwayApp() {
                 </div>
 
                 {/* Swap Button */}
-                <div className="lg:col-span-1 flex justify-center pt-5">
+                <div className="lg:col-span-1 flex justify-center items-end pb-0.5 pt-1 lg:pt-5">
                   <button
                     onClick={handleSwapStations}
-                    className={`p-2 rounded-xl border transition cursor-pointer ${
+                    className={`p-2 rounded-xl border transition cursor-pointer w-full sm:w-auto flex items-center justify-center ${
                       isLight
                         ? "bg-[#FFF6DC] border-[#76C0EC] hover:bg-[#76C0EC]/30 text-[#425B9A]"
                         : "bg-[#222831] border-[#948979]/50 hover:border-[#DFD0B8] text-[#DFD0B8]"
@@ -892,6 +892,7 @@ export default function RailwayApp() {
                     title="Swap route stations"
                   >
                     <ArrowRightLeft className="h-4 w-4" />
+                    <span className="text-[11px] font-bold ml-1.5 sm:hidden">Swap Stations</span>
                   </button>
                 </div>
 
@@ -1417,17 +1418,17 @@ export default function RailwayApp() {
                         : "bg-[#393E46]/90 border-[#948979]/30 shadow-lg shadow-[#222831]/60"
                     }`}
                   >
-                    <div className="flex items-center justify-between pb-4 border-b border-dashed border-slate-700/30">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-dashed border-slate-700/30 gap-3">
                       <div className="flex items-center space-x-3">
                         <div
-                          className={`p-2.5 rounded-xl border ${
+                          className={`p-2.5 rounded-xl border shrink-0 ${
                             isLight ? "bg-[#FFF6DC] border-[#76C0EC] text-[#425B9A]" : "bg-[#222831] border-[#948979]/50 text-[#DFD0B8]"
                           }`}
                         >
                           <Users className="h-5 w-5" />
                         </div>
                         <div>
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-2 flex-wrap gap-1">
                             <h3 className="text-base font-black">Passenger Details</h3>
                             <span
                               className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
@@ -1449,7 +1450,7 @@ export default function RailwayApp() {
                       <button
                         onClick={handleAddPassenger}
                         disabled={passengers.length >= 4}
-                        className={`px-3.5 py-2 border disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold rounded-xl transition flex items-center space-x-1.5 cursor-pointer ${
+                        className={`w-full sm:w-auto px-3.5 py-2 border disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold rounded-xl transition flex items-center justify-center space-x-1.5 cursor-pointer shrink-0 ${
                           isLight
                             ? "bg-[#FFF6DC] hover:bg-[#76C0EC]/30 border-[#76C0EC] text-[#425B9A]"
                             : "bg-[#222831] hover:border-[#DFD0B8] border-[#948979]/50 text-[#DFD0B8]"
@@ -1712,14 +1713,14 @@ export default function RailwayApp() {
                         : "bg-[#393E46] border-2 border-[#DFD0B8] text-[#DFD0B8] shadow-xl"
                     }`}
                   >
-                    <div className="flex items-center justify-between pb-4 border-b border-dashed border-slate-700/30">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-dashed border-slate-700/30 gap-3">
                       <div>
                         <span className="text-xs uppercase tracking-wider text-amber-400 font-extrabold flex items-center space-x-1.5">
-                          <Clock className="h-4 w-4 animate-spin" />
+                          <Clock className="h-4 w-4 animate-spin shrink-0" />
                           <span>Seat Hold Active (Status: {holdResult.booking_status})</span>
                         </span>
-                        <div className="flex items-center space-x-3 mt-1.5">
-                          <h3 className="text-2xl font-mono font-black">
+                        <div className="flex items-center flex-wrap gap-2 sm:gap-3 mt-1.5">
+                          <h3 className="text-xl sm:text-2xl font-mono font-black break-all">
                             PNR: {holdResult.pnr}
                           </h3>
                           <button
@@ -1744,7 +1745,7 @@ export default function RailwayApp() {
                           </button>
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="sm:text-right">
                         <span className="text-[10px] opacity-75 uppercase font-bold block">
                           Time to Complete Payment
                         </span>
@@ -1783,23 +1784,23 @@ export default function RailwayApp() {
                     </div>
 
                     {/* Payment Simulator Actions */}
-                    <div className="pt-2 border-t border-dashed border-slate-700/30 flex items-center space-x-3">
+                    <div className="pt-2 border-t border-dashed border-slate-700/30 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
                       <button
                         onClick={() => handlePayment(true)}
                         disabled={loading}
-                        className={`flex-1 font-bold py-3 rounded-xl transition text-xs flex items-center justify-center space-x-2 cursor-pointer shadow-lg ${
+                        className={`flex-1 font-bold py-3 px-4 rounded-xl transition text-xs flex items-center justify-center space-x-2 cursor-pointer shadow-lg ${
                           isLight
                             ? "bg-[#425B9A] hover:bg-[#334677] text-white"
                             : "bg-[#DFD0B8] text-[#222831] font-black hover:bg-[#cfbe9e]"
                         }`}
                       >
                         <CreditCard className="h-4 w-4" />
-                        <span>Simulate Successful Payment (₹{500 * holdResult.passengers.length})</span>
+                        <span>Simulate Successful Payment (₹{fareBreakdown.total})</span>
                       </button>
                       <button
                         onClick={() => handlePayment(false)}
                         disabled={loading}
-                        className="px-4 py-3 rounded-xl font-bold transition text-xs cursor-pointer border bg-rose-950/80 hover:bg-rose-900 border-rose-800 text-rose-300"
+                        className="px-5 py-3 rounded-xl font-bold transition text-xs cursor-pointer border bg-rose-950/80 hover:bg-rose-900 border-rose-800 text-rose-300 text-center"
                       >
                         Simulate Failure
                       </button>
@@ -1816,12 +1817,12 @@ export default function RailwayApp() {
                         : "bg-[#393E46] border-2 border-emerald-500 text-[#DFD0B8]"
                     }`}
                   >
-                    <div className="flex items-center justify-between pb-3 border-b border-dashed border-slate-700/30">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-dashed border-slate-700/30 gap-3">
                       <div className="flex items-center space-x-3">
                         <CheckCircle className="h-8 w-8 text-emerald-400 shrink-0" />
                         <div>
-                          <div className="flex items-center space-x-3">
-                            <h3 className="text-xl font-black">
+                          <div className="flex items-center flex-wrap gap-2">
+                            <h3 className="text-lg sm:text-xl font-black break-all">
                               Booking Finalized! PNR: {bookingConfirmed.pnr}
                             </h3>
                             <button
@@ -1917,7 +1918,7 @@ export default function RailwayApp() {
                 </div>
               </div>
 
-              <div className="flex space-x-3">
+              <div className="flex flex-col sm:flex-row gap-2.5">
                 <input
                   type="text"
                   placeholder="Enter 10-digit PNR Number (e.g. 1234567890)"
@@ -1932,7 +1933,7 @@ export default function RailwayApp() {
                 <button
                   onClick={handlePNRLookup}
                   disabled={loading || !pnrQuery.trim()}
-                  className={`px-6 py-2.5 rounded-xl font-bold transition text-xs flex items-center space-x-1.5 cursor-pointer shadow-md ${
+                  className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-bold transition text-xs flex items-center justify-center space-x-1.5 cursor-pointer shadow-md ${
                     isLight
                       ? "bg-[#425B9A] text-white hover:bg-[#334677]"
                       : "bg-[#DFD0B8] text-[#222831] hover:bg-[#cfbe9e] font-black"
@@ -2258,7 +2259,7 @@ export default function RailwayApp() {
 
                     {/* Merge-Sorted Berths Table */}
                     <div className="overflow-x-auto rounded-xl border border-slate-700/40">
-                      <table className="w-full text-left text-xs">
+                      <table className="w-full text-left text-xs min-w-[620px]">
                         <thead
                           className={`font-black uppercase tracking-wider text-[11px] ${
                             isLight ? "bg-[#FFF6DC] text-[#425B9A]" : "bg-[#222831] text-[#DFD0B8]"
@@ -2365,7 +2366,7 @@ export default function RailwayApp() {
                           </span>
                         </div>
                         <div className="overflow-x-auto rounded-xl border border-slate-700/40">
-                          <table className="w-full text-left text-xs">
+                          <table className="w-full text-left text-xs min-w-[540px]">
                             <thead
                               className={`font-black uppercase tracking-wider text-[10px] ${
                                 isLight ? "bg-[#FFF6DC] text-[#425B9A]" : "bg-[#222831] text-[#DFD0B8]"
@@ -2410,10 +2411,10 @@ export default function RailwayApp() {
         {/* ===================== TAB 4: DSA DIAGNOSTICS ===================== */}
         {activeTab === "dsa" && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-black flex items-center space-x-2">
-                  <Database className={`h-5 w-5 ${isLight ? "text-[#425B9A]" : "text-[#DFD0B8]"}`} />
+                  <Database className={`h-5 w-5 shrink-0 ${isLight ? "text-[#425B9A]" : "text-[#DFD0B8]"}`} />
                   <span>Custom DSA Structural Diagnostics</span>
                 </h3>
                 <p
@@ -2426,7 +2427,7 @@ export default function RailwayApp() {
               </div>
               <button
                 onClick={loadDSAMetrics}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center space-x-1.5 cursor-pointer ${
+                className={`self-start sm:self-auto px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center space-x-1.5 cursor-pointer shrink-0 ${
                   isLight ? "bg-white border-[#76C0EC] text-[#425B9A]" : "bg-[#393E46] border-[#948979]/40 text-[#DFD0B8] hover:border-[#DFD0B8]"
                 }`}
               >
@@ -2743,7 +2744,7 @@ export default function RailwayApp() {
       </main>
 
       {/* Floating Notifications Toasts */}
-      <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm w-full pointer-events-none">
+      <div className="fixed bottom-4 right-2 sm:right-4 left-2 sm:left-auto z-50 space-y-2 max-w-sm w-auto pointer-events-none">
         {toasts.map((toast) => (
           <div
             key={toast.id}

@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # Railway Reservation System with Custom DSA & Waiting-List Engine
 # Universal Auto-Install & Launcher for Windows (FastAPI Backend + Next.js Frontend)
 # ==============================================================================

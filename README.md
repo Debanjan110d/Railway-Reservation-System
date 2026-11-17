@@ -49,6 +49,8 @@ To keep live evaluation and testing clean, intuitive, and immediate, the databas
 
 ## 4. Quick Start & Multi-Device Launchers
 
+> 📖 **Comprehensive Step-by-Step Guide:** For detailed platform setup, Wi-Fi LAN testing, feature walkthroughs, and troubleshooting, see [HOW_TO_RUN.md](HOW_TO_RUN.md).
+
 ### Option A: Windows Double-Click Launcher
 Double-click `run.bat` in File Explorer.
 
