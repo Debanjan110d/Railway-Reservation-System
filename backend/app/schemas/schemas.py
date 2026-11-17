@@ -41,6 +41,7 @@ class PassengerCreate(BaseModel):
 class BookingCreate(BaseModel):
     train_run_id: int
     quota: str = "GN"  # GN, TQ, LD, SS
+    travel_class: Optional[str] = None  # 2AC, 3AC, SL, CC, EC, 2S
     passengers: List[PassengerCreate]
     idempotency_key: Optional[str] = None
 
@@ -48,6 +49,13 @@ class BookingCreate(BaseModel):
     @classmethod
     def normalize_quota(cls, v: str) -> str:
         return str(v).strip().upper() if v else "GN"
+
+    @field_validator("travel_class", mode="before")
+    @classmethod
+    def normalize_travel_class(cls, v: Optional[str]) -> Optional[str]:
+        if not v or str(v).strip().upper() in ["ALL", "NONE"]:
+            return None
+        return str(v).strip().upper()
 
 class PaymentRequest(BaseModel):
     pnr: str

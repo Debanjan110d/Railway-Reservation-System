@@ -5,11 +5,13 @@ import datetime
 from app.database.connection import get_db
 from app.models.entities import Train, TrainRun, Coach, Berth
 from app.schemas.schemas import TrainCreateRequest
+from app.services.reservation_service import ReservationService
 
 router = APIRouter(prefix="/trains", tags=["Trains"])
 
 @router.get("/")
 def list_trains(db: Session = Depends(get_db)):
+    ReservationService.cleanup_expired_holds(db)
     trains = db.query(Train).all()
     res = []
     for t in trains:
@@ -47,6 +49,7 @@ def list_trains(db: Session = Depends(get_db)):
 
 @router.get("/{train_run_id}/layout")
 def get_train_run_layout(train_run_id: int, db: Session = Depends(get_db)):
+    ReservationService.cleanup_expired_holds(db)
     run = db.query(TrainRun).filter(TrainRun.id == train_run_id).first()
     if not run:
         raise HTTPException(status_code=404, detail="Train run not found")

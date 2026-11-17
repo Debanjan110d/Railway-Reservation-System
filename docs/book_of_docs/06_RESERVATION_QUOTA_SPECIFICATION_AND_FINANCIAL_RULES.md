@@ -140,3 +140,4 @@ flowchart TD
 1. **Client Independence:** The client UI only requests a seat hold with passenger attributes and desired quota.
 2. **Backend Authority:** The backend calculates `base_fare`, `tatkal_charge`, and `total_fare` independently using the coach configuration and quota specifications.
 3. **Auditability:** All financial breakdowns are stored in persistent payment records and returned in the `fare_breakdown` JSON response structure.
+

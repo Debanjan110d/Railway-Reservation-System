@@ -409,6 +409,7 @@ export default function RailwayApp() {
       const res = await createBookingHold({
         train_run_id: selectedRunId,
         quota,
+        travel_class: selectedClass !== "ALL" ? selectedClass : undefined,
         passengers: formattedPassengers,
       });
       setHoldResult(res);

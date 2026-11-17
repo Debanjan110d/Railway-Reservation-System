@@ -242,3 +242,40 @@ def test_concurrent_bookings_and_payment_expiry(test_db):
     berth_id = held_booking.passengers[0].allocated_berth_id
     reverted_berth = test_db.query(Berth).filter(Berth.id == berth_id).first()
     assert reverted_berth.current_status == "AVAILABLE"
+
+def test_true_concurrent_threads_no_double_booking(test_db):
+    """
+    Simulates concurrent requests competing for available berths simultaneously.
+    Verifies that _reservation_lock completely eliminates duplicate seat allocation.
+    """
+    bind_engine = test_db.get_bind()
+    ThreadSession = sessionmaker(autocommit=False, autoflush=False, bind=bind_engine)
+
+    def attempt_hold(idx):
+        session = ThreadSession()
+        try:
+            req = BookingCreate(
+                train_run_id=1,
+                quota="GN",
+                passengers=[PassengerCreate(name=f"Concurrent Passenger {idx}", age=25 + idx, gender="M")]
+            )
+            return ReservationService.create_booking_hold(session, req)
+        finally:
+            session.close()
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        f1 = executor.submit(attempt_hold, 1)
+        f2 = executor.submit(attempt_hold, 2)
+        res1 = f1.result()
+        res2 = f2.result()
+
+    p1 = res1["passengers"][0]
+    p2 = res2["passengers"][0]
+
+    # If both got a confirmed hold, verify they got DIFFERENT berths
+    if p1["status"] == "HELD_CNF" and p2["status"] == "HELD_CNF":
+        assert (p1["coach_code"], p1["berth_number"]) != (p2["coach_code"], p2["berth_number"]), (
+            f"Double-booking detected! Both got {p1['coach_code']} #{p1['berth_number']}"
+        )
+    # One could be HELD_CNF and one HELD_WL
+    assert {res1["booking_status"], res2["booking_status"]}.issubset({"HELD", "HELD_WL"})

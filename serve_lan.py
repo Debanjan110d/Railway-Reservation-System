@@ -2,6 +2,7 @@
 """
 Railway Reservation System - Local Area Network (LAN) Server Runner
 Enables access from any device (smartphones, tablets, PCs) connected to the same Wi-Fi/LAN.
+Includes auto-dependency verification and setup for fresh laptops.
 """
 
 import os
@@ -33,6 +34,33 @@ def get_lan_ip() -> str:
         s.close()
     return ip
 
+def ensure_dependencies():
+    """Verify and auto-install Python and Node dependencies if running on a fresh laptop."""
+    print("[*] Verifying Python backend dependencies...")
+    try:
+        import fastapi
+        import uvicorn
+        import sqlalchemy
+        import pydantic
+        print("[✓] Python backend dependencies verified.")
+    except ImportError:
+        print("[!] Missing Python packages. Installing from backend/requirements.txt...")
+        req_file = BACKEND_DIR / "requirements.txt"
+        cmd = [sys.executable, "-m", "pip", "install", "-r", str(req_file)]
+        subprocess.run(cmd, check=True)
+        print("[✓] Backend dependencies installed successfully.")
+
+    print("[*] Verifying Frontend node_modules...")
+    node_modules = FRONTEND_DIR / "node_modules"
+    if not node_modules.exists():
+        print("[!] node_modules not found in frontend. Running npm install (first-time setup)...")
+        npm_bin = "npm.cmd" if sys.platform == "win32" else "npm"
+        cmd = [npm_bin, "install"]
+        subprocess.run(cmd, cwd=str(FRONTEND_DIR), check=True, shell=(sys.platform == "win32"))
+        print("[✓] Frontend npm packages installed successfully.")
+    else:
+        print("[✓] Frontend node_modules verified.")
+
 def seed_database_if_needed():
     """Ensure database has initial seed data."""
     print("[*] Checking database and seeding trains...")
@@ -57,6 +85,10 @@ def main():
     print(f"[*] Detected Primary LAN IPv4 Address: {lan_ip}")
     print()
 
+    # Step 1: Auto-verify & install dependencies on fresh laptops
+    ensure_dependencies()
+
+    # Step 2: Seed DB
     seed_database_if_needed()
 
     # Pass dynamic LAN API URL to frontend so mobile browsers can communicate with backend
@@ -108,52 +140,49 @@ def main():
     print(f"   [💻] Host Machine URL:        http://localhost:{port_frontend}")
     print(f"   [🔌] Backend API Docs:        http://{lan_ip}:{port_backend}/docs")
     print(f"   [📊] Custom DSA Diagnostics:  http://{lan_ip}:{port_backend}/api/v1/metrics/dsa")
-    print("-" * 72)
-    print(f"   Connect your smartphone/laptop to the same Wi-Fi network,")
-    print(f"   open your browser and navigate to: http://{lan_ip}:{port_frontend}")
     print("=" * 72)
-    print("Press CTRL+C anytime to cleanly stop all servers.\n")
+    print("   Press Ctrl+C anytime to stop both servers.")
+    print("=" * 72)
 
     def shutdown(sig, frame):
-        print("\n[*] Shutting down LAN servers...")
+        print("\n[*] Gracefully shutting down LAN servers...")
         try:
             backend_proc.terminate()
+            backend_proc.wait(timeout=3)
         except Exception:
-            pass
+            backend_proc.kill()
         try:
             frontend_proc.terminate()
+            frontend_proc.wait(timeout=3)
         except Exception:
-            pass
-        print("[✓] All processes stopped. Goodbye!")
+            frontend_proc.kill()
+        print("[✓] All servers stopped cleanly.")
         sys.exit(0)
 
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
-    # Stream logs to stdout and file
-    with open(LOG_FILE, "a", encoding="utf-8") as log_out:
-        log_out.write(f"\n--- LAN Server started on {lan_ip} at {time.ctime()} ---\n")
-        while True:
-            # Check if any process exited unexpectedly
-            b_code = backend_proc.poll()
-            f_code = frontend_proc.poll()
+    # Monitor stdout and forward to console and log file
+    with open(LOG_FILE, "a", encoding="utf-8") as log_f:
+        try:
+            while True:
+                b_line = backend_proc.stdout.readline() if backend_proc.poll() is None else None
+                f_line = frontend_proc.stdout.readline() if frontend_proc.poll() is None else None
 
-            if b_code is not None:
-                err_msg = f"[!] Backend process exited with code {b_code}"
-                print(err_msg)
-                with open(ERR_FILE, "a", encoding="utf-8") as err_f:
-                    err_f.write(f"{time.ctime()}: {err_msg}\n")
-                shutdown(None, None)
+                if b_line:
+                    line = f"[Backend] {b_line.strip()}"
+                    log_f.write(line + "\n")
+                    log_f.flush()
+                if f_line:
+                    line = f"[Frontend] {f_line.strip()}"
+                    log_f.write(line + "\n")
+                    log_f.flush()
 
-            if f_code is not None:
-                err_msg = f"[!] Frontend process exited with code {f_code}"
-                print(err_msg)
-                with open(ERR_FILE, "a", encoding="utf-8") as err_f:
-                    err_f.write(f"{time.ctime()}: {err_msg}\n")
-                shutdown(None, None)
-
-            time.sleep(1)
+                if backend_proc.poll() is not None and frontend_proc.poll() is not None:
+                    break
+                time.sleep(0.05)
+        except KeyboardInterrupt:
+            shutdown(None, None)
 
 if __name__ == "__main__":
     main()
-

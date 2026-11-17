@@ -1,4 +1,13 @@
+import sys
+import os
+from pathlib import Path
 import datetime
+
+# Ensure backend root is on sys.path regardless of execution working directory
+backend_dir = Path(__file__).resolve().parent.parent.parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
 from sqlalchemy.orm import Session
 from app.models.entities import Train, TrainRun, Coach, Berth, Booking, Passenger
 from app.database.connection import engine, Base, SessionLocal

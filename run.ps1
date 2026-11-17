@@ -1,10 +1,11 @@
-# ==============================================================================
+﻿# ==============================================================================
 # Railway Reservation System with Custom DSA & Waiting-List Engine
-# Single-Command Windows Launcher for Backend (FastAPI) and Frontend (Next.js)
+# Universal Auto-Install & Launcher for Windows (FastAPI Backend + Next.js Frontend)
 # ==============================================================================
 
 param(
-    [switch]$NoLog = $false
+    [switch]$NoLog = $false,
+    [switch]$SkipInstall = $false
 )
 
 $ProjectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -45,18 +46,88 @@ Write-Host "=================================================================" -
 Write-Host "   RAILWAY RESERVATION SYSTEM (ACADEMIC DSA ENGINE)              " -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan
 
+# -----------------------------------------------------------------------------
+# Prerequisite Verification: Python & Node.js
+# -----------------------------------------------------------------------------
+$PythonCmd = Get-Command python -ErrorAction SilentlyContinue
+if (-not $PythonCmd) {
+    Log-ErrorMsg "Python is not installed or not in system PATH. Please install Python 3.10+ from https://python.org."
+    exit 1
+}
+
+$NodeCmd = Get-Command node -ErrorAction SilentlyContinue
+$NpmCmd = Get-Command npm -ErrorAction SilentlyContinue
+if (-not $NodeCmd -or -not $NpmCmd) {
+    Log-ErrorMsg "Node.js / npm is not installed or not in system PATH. Please install Node.js from https://nodejs.org."
+    exit 1
+}
+
+# -----------------------------------------------------------------------------
+# Step 1: Auto-Install Backend Python Dependencies (if missing)
+# -----------------------------------------------------------------------------
+if (-not $SkipInstall) {
+    Write-Host "[*] Checking Python backend dependencies..." -ForegroundColor Yellow
+    $NeedPipInstall = $false
+    try {
+        $check = python -c "import fastapi, uvicorn, sqlalchemy, pydantic" 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            $NeedPipInstall = $true
+        }
+    } catch {
+        $NeedPipInstall = $true
+    }
+
+    if ($NeedPipInstall) {
+        Write-Host "[!] Missing Python dependencies. Running pip install -r backend/requirements.txt..." -ForegroundColor Yellow
+        Log-InfoMsg "Installing backend dependencies via pip..."
+        try {
+            python -m pip install --upgrade pip --quiet
+            python -m pip install -r "$ProjectRoot\backend\requirements.txt"
+            Write-Host "[✓] Python dependencies installed successfully." -ForegroundColor Green
+        } catch {
+            Log-ErrorMsg "pip install failed: $_"
+        }
+    } else {
+        Write-Host "[✓] Python backend dependencies verified." -ForegroundColor Green
+    }
+
+    # -----------------------------------------------------------------------------
+    # Step 2: Auto-Install Frontend npm Dependencies (if missing)
+    # -----------------------------------------------------------------------------
+    $NodeModulesPath = Join-Path $ProjectRoot "frontend\node_modules"
+    if (-not (Test-Path $NodeModulesPath)) {
+        Write-Host "[!] node_modules not found in frontend. Running npm install (first-time setup)..." -ForegroundColor Yellow
+        Log-InfoMsg "Running npm install in frontend directory..."
+        try {
+            Set-Location "$ProjectRoot\frontend"
+            cmd.exe /c "npm install"
+            Set-Location $ProjectRoot
+            Write-Host "[✓] Frontend npm packages installed successfully." -ForegroundColor Green
+        } catch {
+            Set-Location $ProjectRoot
+            Log-ErrorMsg "npm install failed: $_"
+        }
+    } else {
+        Write-Host "[✓] Frontend node_modules verified." -ForegroundColor Green
+    }
+}
+
 $env:PYTHONPATH = "$ProjectRoot\backend"
 
-# Step 1: Initialize Database & Seed
-Write-Host "[*] Step 1: Initializing Database & Seeding Trains..." -ForegroundColor Yellow
+# -----------------------------------------------------------------------------
+# Step 3: Initialize Database & Seed Trains
+# -----------------------------------------------------------------------------
+Write-Host "[*] Initializing Database & Seeding Trains..." -ForegroundColor Yellow
 try {
     python "$ProjectRoot\backend\app\database\seed.py"
 } catch {
     Log-ErrorMsg "Database initialization or seeding failed: $_"
 }
 
-# Step 2: Start Backend
-Write-Host "[*] Step 2: Starting FastAPI Backend on http://127.0.0.1:8000..." -ForegroundColor Green
+# -----------------------------------------------------------------------------
+# Step 4: Start FastAPI Backend on 127.0.0.1:8000
+# -----------------------------------------------------------------------------
+Write-Host "[*] Starting FastAPI Backend on http://127.0.0.1:8000..." -ForegroundColor Green
 try {
     $BackendProcess = Start-Process python -ArgumentList "-m uvicorn app.main:app --app-dir `"$ProjectRoot\backend`" --host 127.0.0.1 --port 8000" -PassThru -NoNewWindow
     Log-InfoMsg "FastAPI Backend started with PID $($BackendProcess.Id)."
@@ -66,8 +137,10 @@ try {
 
 Start-Sleep -Seconds 2
 
-# Step 3: Start Frontend (using cmd.exe /c to properly invoke npm.cmd on Windows)
-Write-Host "[*] Step 3: Starting Next.js Frontend on http://localhost:3000..." -ForegroundColor Green
+# -----------------------------------------------------------------------------
+# Step 5: Start Next.js Frontend on http://localhost:3000
+# -----------------------------------------------------------------------------
+Write-Host "[*] Starting Next.js Frontend on http://localhost:3000..." -ForegroundColor Green
 try {
     Set-Location "$ProjectRoot\frontend"
     $FrontendProcess = Start-Process "cmd.exe" -ArgumentList "/c npm run dev -- -p 3000" -PassThru -NoNewWindow
@@ -84,9 +157,9 @@ Write-Host "   SYSTEM SUCCESSFULLY LAUNCHED!                                " -F
 Write-Host "   - Frontend UI:      http://localhost:3000                     " -ForegroundColor White
 Write-Host "   - Backend API Docs: http://127.0.0.1:8000/docs                " -ForegroundColor White
 Write-Host "   - DSA Diagnostics:  http://127.0.0.1:8000/api/v1/metrics/dsa  " -ForegroundColor White
-Write-Host "   - Error Log File:   $ErrorLog                                 " -ForegroundColor Yellow
+Write-Host "   - Dedicated Log:    $ErrorLog                                 " -ForegroundColor Yellow
 Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host "Press Ctrl+C to stop both processes."
+Write-Host "Press Ctrl+C to stop both processes cleanly."
 
 try {
     $watchPids = @()
