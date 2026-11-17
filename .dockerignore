@@ -1,0 +1,28 @@
+# Git & GitHub
+.git
+.gitignore
+.github
+
+# Node / Frontend
+**/node_modules
+**/.next
+**/out
+**/build
+**/.npm
+
+# Python / Backend
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.pytest_cache
+**/.coverage
+**/venv
+**/env
+**/backend/railway.db
+
+# Logs & OS artifacts
+**/logs
+**/*.log
+**/.DS_Store
+**/Thumbs.db

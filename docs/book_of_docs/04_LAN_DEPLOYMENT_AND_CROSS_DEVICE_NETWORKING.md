@@ -1,4 +1,4 @@
-# Chapter 4: Local Area Network (LAN) & Cross-Device Engineering
+# Chapter 4: Local Area Network (LAN), Portability & Docker Engineering
 
 ---
 
@@ -7,7 +7,7 @@
 For academic evaluators, university project exhibitions, and viva examinations, demonstrating an application solely on `localhost:3000` is often insufficient. Evaluators look for proof that:
 1. The web application is truly multi-tiered and accessible from external devices (e.g., an examiner accessing the booking portal on their smartphone while an admin monitors the reservation chart on a laptop).
 2. The system handles concurrent requests from multiple distinct network nodes simultaneously.
-3. Network boundaries, IP routing, and Cross-Origin Resource Sharing (CORS) are properly configured.
+3. Network boundaries, IP routing, Cross-Origin Resource Sharing (CORS), and containerization are properly configured.
 
 ---
 
@@ -16,7 +16,7 @@ For academic evaluators, university project exhibitions, and viva examinations, 
 ### The Core Problem
 When running full-stack applications in development, the frontend client typically communicates with the backend via `http://localhost:8000` or `http://127.0.0.1:8000`.
 
-When an external device on the local Wi-Fi (such as an Android or iOS smartphone at `192.168.0.150`) navigates to the host machine's IP (`http://192.168.0.107:3000`):
+When an external device on the local Wi-Fi (such as an Android or iOS smartphone at `192.168.0.150`) navigates to the host machine's IP (`http://192.168.0.106:3000`):
 - Next.js downloads React components to the mobile browser.
 - When the user clicks "Book Ticket", the mobile browser executes JavaScript:
   ```typescript
@@ -42,87 +42,83 @@ export const API_BASE_URL =
 ```
 
 - When accessed from the host machine: `window.location.hostname` is `localhost` $\implies$ API points to `http://localhost:8000/api/v1`.
-- When accessed from an iPhone/Android device: `window.location.hostname` is `192.168.0.107` $\implies$ API automatically routes to `http://192.168.0.107:8000/api/v1` without hardcoded configuration!
+- When accessed from an iPhone/Android device: `window.location.hostname` is `192.168.0.106` $\implies$ API automatically routes to `http://192.168.0.106:8000/api/v1` without manual configuration.
 
 ---
 
-#### 2. Automated Python LAN Server Runner (`serve_lan.py`)
-To make launching across the LAN completely seamless, we created `serve_lan.py` at the project root.
+#### 2. Next.js 16 Cross-Origin Resource Safeguards (`allowedDevOrigins`)
+In Next.js 16, dev-server HMR (Hot Module Replacement) WebSocket connections from LAN origins are blocked by default for security, resulting in:
+`⚠ Blocked cross-origin request to Next.js dev resource /_next/hmr from "192.168.0.106"`
 
-##### Dynamic Socket Route Discovery
-Instead of parsing unreliable OS shell strings or hardcoding subnets, the script probes the kernel's routing table:
+We configure `frontend/next.config.ts` to query local network interfaces dynamically using Node's `os.networkInterfaces()` and permit private IP subnets (`192.168.*.*`, `10.*.*.*`, `172.*.*.*`):
 
-```python
-def get_lan_ip() -> str:
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        # Connecting to public DNS resolves the active outbound network interface
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-    except Exception:
-        ip = "127.0.0.1"
-    finally:
-        s.close()
-    return ip
+```typescript
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+  allowedDevOrigins: getAllowedDevOrigins(), // Permits LAN clients without warnings
+  turbopack: { ... },
+};
 ```
 
-##### Coordinated Dual-Process Host Binding
-`serve_lan.py` binds both servers to `0.0.0.0` (all available interfaces):
-- **FastAPI Backend:** `python -m uvicorn app.main:app --host 0.0.0.0 --port 8000`
-- **Next.js Frontend:** `npm run dev -- -H 0.0.0.0 -p 3000`
+---
+
+#### 3. Automatic Port Collision Protection (`free_port_if_occupied`)
+To avoid `EADDRINUSE` crashes when relaunching after unexpected script termination, `serve_lan.py` and `run.ps1` detect and free ports 8000 and 3000 automatically before binding Uvicorn and Next.js.
 
 ---
 
 ## 3. How to Launch and Test Across LAN Devices
 
-### Step 1: Ensure Host & Devices Share the Same Wi-Fi Network
-Connect your development machine (laptop/desktop) and test devices (smartphones, tablets, other laptops) to the same local Wi-Fi network or mobile hotspot.
-
-### Step 2: Run the LAN Runner Script
-Open PowerShell or terminal in the project directory:
-
+### Option A: Automated LAN Runner
 ```bash
 python serve_lan.py
 ```
+*Auto-detects active LAN IPv4, verifies dependencies, seeds 2 simplified Kolkata trains, and prints mobile and PC access URLs.*
 
-### Step 3: Terminal Output Display
-The launcher detects the primary LAN IP and prints an interactive ASCII operational card:
-
-```
-========================================================================
-      RAILWAY RESERVATION SYSTEM (ACADEMIC DSA ENGINE) - LAN HOST
-========================================================================
-[*] Detected Primary LAN IPv4 Address: 192.168.0.107
-[*] Checking database and seeding trains...
-[✓] Database check complete.
-[*] Starting FastAPI Backend on 0.0.0.0:8000...
-[*] Starting Next.js Frontend on 0.0.0.0:3000...
-
-========================================================================
-   LAN WEB APPLICATION IS NOW LIVE ACROSS YOUR NETWORK!
-========================================================================
-   [📱] Wi-Fi / LAN Mobile URL:   http://192.168.0.107:3000
-   [💻] Host Machine URL:        http://localhost:3000
-   [🔌] Backend API Docs:        http://192.168.0.107:8000/docs
-   [📊] Custom DSA Diagnostics:  http://192.168.0.107:8000/api/v1/metrics/dsa
-------------------------------------------------------------------------
-   Connect your smartphone/laptop to the same Wi-Fi network,
-   open your browser and navigate to: http://192.168.0.107:3000
-========================================================================
+### Option B: Windows PowerShell Script
+```powershell
+.\run.ps1
 ```
 
-### Step 4: Multi-User Concurrent Demonstration
-1. **Device 1 (Mobile Phone):** Open `http://192.168.0.107:3000`, navigate to **Search & Book**, and hold 2 berths on *Bhopal Shatabdi Express*.
-2. **Device 2 (Host PC):** Watch the **Live Coach Layout** update instantly with berths changing to amber (`HELD`).
-3. **Device 3 (Tablet or 2nd Laptop):** Navigate to **Reservation Chart** or **DSA Diagnostics** to observe real-time load factor and hash table collisions update across the network.
+### Option C: Windows Double-Click Launcher
+Double-click `run.bat` in File Explorer.
 
 ---
 
-## 4. Firewall & Troubleshooting Checklist
+## 4. Docker & Containerized Deployment
+
+For evaluation panels requiring containerized demonstration, RailDSA provides two deployment approaches:
+
+### Approach 1: Microservice Orchestration with `docker-compose`
+Spins up separate backend and frontend containers with volume persistence:
+
+```bash
+docker compose up --build
+```
+
+- **Frontend Container:** Port `3000:3000` (Node 20 Alpine)
+- **Backend Container:** Port `8000:8000` (Python 3.11 Slim with SQLite persistence)
+
+### Approach 2: Unified All-in-One Docker Image
+Builds a single self-contained container running both services:
+
+```bash
+# Build the unified image
+docker build -t raildsa .
+
+# Run the container
+docker run -p 3000:3000 -p 8000:8000 raildsa
+```
+
+Access the UI at [http://localhost:3000](http://localhost:3000) and API docs at [http://localhost:8000/docs](http://localhost:8000/docs).
+
+---
+
+## 5. Firewall & Troubleshooting Checklist
 
 | Symptom | Cause | Solution |
 | :--- | :--- | :--- |
 | Mobile phone shows "Site unreachable" | Windows Defender Firewall blocking port 3000/8000 | In Windows Security, allow Node.js and Python through Private Networks, or run: `New-NetFirewallRule -DisplayName "RailDSA" -Direction Inbound -LocalPort 3000,8000 -Protocol TCP -Action Allow` in admin PowerShell. |
 | Host shows page, but buttons fail | Mobile cannot reach backend on port 8000 | Check that both `0.0.0.0:8000` and `0.0.0.0:3000` are bound and not blocked by router client-isolation. |
 | Mobile Hotspot isolation | Some public/college Wi-Fi networks block device-to-device traffic | Use a personal mobile hotspot where all devices are on the same subnet without AP client isolation. |
-
+| `EADDRINUSE: 3000` | Previous Next.js process still alive | Relaunch using `run.bat` or `python serve_lan.py` (which includes automated port cleanup). |

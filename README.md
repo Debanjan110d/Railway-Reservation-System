@@ -8,9 +8,9 @@ An academic Data Structures and Algorithms (DSA) project featuring custom berth 
 
 - **Frontend**: Next.js 16 (React 19 + TypeScript + Tailwind CSS v4 via Turbopack)
 - **Backend**: Python 3.11+ / FastAPI
-- **Database**: PostgreSQL / SQLite (with SQLAlchemy ORM)
-- **Logging**: Dedicated non-locking runtime error log (`logs/error.log`, tracked in Git)
-- **CI/CD & Automation**: GitHub Actions (`backend-ci.yml`, `dependabot.yml`)
+- **Database**: SQLite / PostgreSQL (SQLAlchemy ORM)
+- **Containerization**: Docker & Docker Compose (`Dockerfile`, `Dockerfile.backend`, `Dockerfile.frontend`, `docker-compose.yml`)
+- **Logging**: Dedicated non-locking runtime error log (`logs/error.log`)
 
 ---
 
@@ -36,57 +36,95 @@ For full mathematical proofs, space/time asymptotic bounds, and empirical simula
 
 ---
 
-## 3. Quick Start & Multi-Device Launchers
+## 3. Simplified Academic Fleet
 
-### Option A: Localhost Launcher (Windows PowerShell)
+To keep live evaluation and testing clean, intuitive, and immediate, the database seeds **2 core showcase trains** across a 3-day schedule window:
+
+| Train No. | Train Name | Route | Coaches & Classes | Showcase Focus |
+| :--- | :--- | :--- | :--- | :--- |
+| **12301** | **Howrah - New Delhi Rajdhani Express** | HWH $\to$ NDLS | `A1` (2AC), `B1` (3AC), `S1` (SL) | Sleeper berth layout, Lower-Berth SS priority, Ladies quota, and Tatkal rules. |
+| **22301** | **Howrah - New Jalpaiguri Vande Bharat** | HWH $\to$ NJP | `C1` (Chair Car), `E1` (Executive Class) | High-speed Chair Car simulation, rapid booking turnover, and instant waitlisting. |
+
+---
+
+## 4. Quick Start & Multi-Device Launchers
+
+### Option A: Windows Double-Click Launcher
+Double-click `run.bat` in File Explorer.
+
+### Option B: Windows PowerShell Launcher (Auto-Installs Dependencies)
 ```powershell
 .\run.ps1
 ```
 
-### Option B: Local Area Network (LAN) Server (Any Phone, Tablet, or PC on Wi-Fi)
+### Option C: Linux / macOS / WSL Bash Launcher
+```bash
+chmod +x run.sh
+./run.sh
+```
+
+### Option D: Local Area Network (LAN) Server (Any Phone, Tablet, or PC on Wi-Fi)
 ```bash
 python serve_lan.py
 ```
-*Auto-detects your primary Wi-Fi IPv4 address (e.g. `192.168.0.107`) and broadcasts the live web UI so any smartphone or laptop on the same network can access the system at `http://<LAN_IP>:3000`!*
-
-- **Frontend UI**: [http://localhost:3000](http://localhost:3000) (or `http://<LAN_IP>:3000`)
-- **Interactive API Docs**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- **DSA Diagnostics & Live Metrics**: [http://127.0.0.1:8000/api/v1/metrics/dsa](http://127.0.0.1:8000/api/v1/metrics/dsa)
-- **Dedicated Error Log**: `logs/error.log`
+*Auto-detects your primary Wi-Fi IPv4 address (e.g. `192.168.0.106`), handles port freeing to avoid `EADDRINUSE`, and broadcasts the live web UI so any smartphone or laptop on the same network can access the system at `http://<LAN_IP>:3000`!*
 
 ---
 
-## 4. Academic College Project "Book of Documentation"
+## 5. Docker Deployment
 
-A comprehensive 6-chapter academic textbook detailing real-world engineering challenges, custom algorithmic formulations, mathematical proofs, quota specifications, and examiner viva voce prep is stored in [`docs/book_of_docs/`](docs/book_of_docs/README.md):
+### Approach 1: Docker Compose (Microservices)
+```bash
+# Build and run backend (port 8000) and frontend (port 3000)
+docker compose up --build
+```
+
+### Approach 2: Unified Single Docker Image
+```bash
+# Build the unified all-in-one container
+docker build -t raildsa .
+
+# Run container exposing ports 3000 and 8000
+docker run -p 3000:3000 -p 8000:8000 raildsa
+```
+
+- **Frontend Web UI**: [http://localhost:3000](http://localhost:3000)
+- **FastAPI Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **DSA Diagnostics & Live Metrics**: [http://localhost:8000/api/v1/metrics/dsa](http://localhost:8000/api/v1/metrics/dsa)
+
+---
+
+## 6. Academic College Project "Book of Documentation"
+
+A comprehensive 6-chapter academic handbook detailing real-world engineering challenges, custom algorithmic formulations, mathematical proofs, quota specifications, and examiner viva voce prep is stored in [`docs/book_of_docs/`](docs/book_of_docs/README.md):
 
 - [**Chapter 1: Problem Analysis & Real-World Challenges**](docs/book_of_docs/01_PROBLEM_ANALYSIS_AND_CHALLENGES.md) — The *Tatkal* concurrency bottleneck, double-booking race condition, waitlist priority inversion, and SQL lock contention.
 - [**Chapter 2: Custom DSA Formulations & Mathematical Solutions**](docs/book_of_docs/02_CUSTOM_DSA_SOLUTIONS.md) — Polynomial Rolling Hash Table, Kirsch-Mitzenmacher Bloom Filter ($m=95{,}850, k=6$), 4-Tuple Quota Min-Heap, Doubly-Linked Circular RAC Queue, and Stable Merge Sort.
 - [**Chapter 3: Concurrency, Parallel Processing & Normalization**](docs/book_of_docs/03_CONCURRENCY_AND_PARALLEL_PROCESSING.md) — Multi-threaded safety with `threading.RLock`, 2-phase seat holds with 5-minute TTL locks, idempotency tokens, and boundary casing/whitespace normalization.
-- [**Chapter 4: Local Area Network (LAN) & Cross-Device Engineering**](docs/book_of_docs/04_LAN_DEPLOYMENT_AND_CROSS_DEVICE_NETWORKING.md) — Dynamic socket discovery, resolving the mobile loopback trap, and multi-device live testing.
+- [**Chapter 4: Local Area Network (LAN) & Cross-Device Engineering**](docs/book_of_docs/04_LAN_DEPLOYMENT_AND_CROSS_DEVICE_NETWORKING.md) — Dynamic socket discovery, resolving the mobile loopback trap, Next.js 16 `allowedDevOrigins` configuration, and Docker containerization.
 - [**Chapter 5: Empirical Benchmark Results & College Viva Voce Guide**](docs/book_of_docs/05_EXPERIMENTAL_RESULTS_AND_VIVA_PREP.md) — Mathematical complexity matrix, 1,200-event empirical benchmark logs, and 15 commonly asked professor/examiner viva questions with model answers.
 - [**Chapter 6: Reservation Quota Specification & Financial Rules**](docs/book_of_docs/06_RESERVATION_QUOTA_SPECIFICATION_AND_FINANCIAL_RULES.md) — Technical allocation, demographic backend validation (SS age $\ge 60$, LD female only), lower-berth prioritization, statutory Tatkal surcharge calculation, and max 100-year age limit.
 
 ---
 
-## 5. Interactive Demonstration Workflows
+## 7. Interactive Demonstration Workflows
 
 ### Demo 1: Booking & Atomic Berth Hold (5 Min TTL)
 1. Navigate to **Search & Book**.
-2. Select **Bhopal Shatabdi Express (12002)** or **Rajdhani Express (12301)**.
+2. Select **Howrah - New Delhi Rajdhani Express (12301)** or **Howrah - NJP Vande Bharat (22301)**.
 3. Select your desired reservation quota:
-   - `GN`: Standard General priority
-   - `SS`: Senior Citizen (Priority 1 in waiting heap)
-   - `LD`: Ladies Quota (Priority 2 in waiting heap)
-   - `TQ`: Tatkal Waitlist
-4. Fill in passenger details (with automatic senior-citizen priority detection for age $\ge 60$) and select preferred berths.
+   - `GN`: Standard General priority (FCFS)
+   - `SS`: Senior Citizen (Priority 1 Min-Heap)
+   - `LD`: Ladies Quota (Priority 2 Min-Heap)
+   - `TQ`: Tatkal Waitlist Pool
+4. Fill in passenger details (with automatic senior-citizen priority detection for age $\ge 60$ and age limit $1 \le \text{age} \le 100$) and choose a berth.
 5. Click **Proceed to Seat Hold (5 Min TTL)**.
-6. Observe the real-time countdown timer, held berths in amber, and toast notification.
+6. Observe the real-time countdown timer, held berths in amber, and notification toast.
 7. Click **Simulate Successful Payment** to confirm berths and index PNR into the Bloom Filter and Hash Table.
 
 ### Demo 2: Priority Waitlist Allocation & Automatic Promotion
 1. Select a train run with zero available berths (or book all berths until full).
-2. Book a passenger with **Senior Citizen (SS)** quota. Notice status allocates as `WAITING (WL)`.
+2. Book a passenger with **Senior Citizen (SS)** quota. Status allocates as `WAITING (WL)`.
 3. Book a second passenger with **General (GN)** quota.
 4. Navigate to **PNR Status** and cancel one of the previously confirmed bookings.
 5. Observe the Min-Heap promotion: The **Senior Citizen (SS)** is promoted first into the freed berth with status `CONFIRMED (CNF)`, while the General passenger moves up the queue.
@@ -102,23 +140,15 @@ A comprehensive 6-chapter academic textbook detailing real-world engineering cha
 2. Select any train run from the dropdown.
 3. Observe all allocated berths stably sorted in $O(N \log N)$ time grouped by `Coach Identifier ASC` followed by `Berth Number ASC`.
 
-### Demo 5: Admin Fleet Management Portal
-1. Navigate to **Admin Portal** tab.
-2. Enter Train Number, Train Name, Route, and Run Dates.
-3. Select coach presets (Standard, High Capacity, or Express Shuttle).
-4. Click **Deploy Train to Reservation Engine** — coaches, runs, and individual berth nodes are instantly populated in database and live in search.
-5. Delete any scheduled train with one click.
-
 ---
 
-## 6. Running Quality Checks Locally
+## 8. Running Automated Quality Checks Locally
 
 ```bash
-# Run full 18-test automated pytest suite
+# Run full 23-test automated pytest suite
 export PYTHONPATH=./backend
 python -m pytest backend/app/tests/ -v
 
 # Run frontend build verification
 cd frontend && npm run build
-```
 ```

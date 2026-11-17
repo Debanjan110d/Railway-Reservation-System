@@ -125,7 +125,26 @@ try {
 }
 
 # -----------------------------------------------------------------------------
-# Step 4: Start FastAPI Backend on 127.0.0.1:8000
+# Pre-launch: Free ports 8000 and 3000 if occupied
+# -----------------------------------------------------------------------------
+function Stop-PortOccupant {
+    param([int]$Port)
+    try {
+        $conns = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
+        foreach ($conn in $conns) {
+            $pId = $conn.OwningProcess
+            if ($pId -and $pId -ne $PID -and $pId -ne 0) {
+                Write-Host "[*] Port $Port is in use by PID $pId. Releasing port..." -ForegroundColor Yellow
+                Stop-Process -Id $pId -Force -ErrorAction SilentlyContinue
+            }
+        }
+    } catch {}
+}
+Stop-PortOccupant -Port 8000
+Stop-PortOccupant -Port 3000
+
+# -----------------------------------------------------------------------------
+# Step 4: Start FastAPI Backend on 0.0.0.0:8000
 # -----------------------------------------------------------------------------
 Write-Host "[*] Starting FastAPI Backend on http://0.0.0.0:8000..." -ForegroundColor Green
 try {

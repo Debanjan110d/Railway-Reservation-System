@@ -3,6 +3,13 @@ import os
 from pathlib import Path
 import datetime
 
+# Ensure stdout handles unicode cleanly across Windows cp1252 / UTF-8
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 # Ensure backend root is on sys.path regardless of execution working directory
 backend_dir = Path(__file__).resolve().parent.parent.parent
 if str(backend_dir) not in sys.path:
@@ -44,28 +51,7 @@ def reset_and_seed_database():
                 "train_name": "Howrah - New Jalpaiguri Vande Bharat Express",
                 "source": "Howrah (HWH)",
                 "destination": "New Jalpaiguri (NJP)",
-                "coaches": [("C1", "CC", 12), ("C2", "CC", 12), ("E1", "EC", 8)]
-            },
-            {
-                "train_number": "12313",
-                "train_name": "Sealdah - New Delhi Rajdhani Express",
-                "source": "Sealdah (SDAH)",
-                "destination": "New Delhi (NDLS)",
-                "coaches": [("A1", "2AC", 8), ("B1", "3AC", 12), ("S1", "SL", 16)]
-            },
-            {
-                "train_number": "12019",
-                "train_name": "Howrah - Ranchi Shatabdi Express",
-                "source": "Howrah (HWH)",
-                "destination": "Ranchi (RNC)",
-                "coaches": [("C1", "CC", 12), ("C2", "CC", 12), ("A1", "2AC", 8)]
-            },
-            {
-                "train_number": "12837",
-                "train_name": "Howrah - Puri Superfast Express",
-                "source": "Howrah (HWH)",
-                "destination": "Puri (PURI)",
-                "coaches": [("A1", "2AC", 8), ("B1", "3AC", 12), ("S1", "SL", 16)]
+                "coaches": [("C1", "CC", 12), ("E1", "EC", 8)]
             }
         ]
 
@@ -115,8 +101,8 @@ def reset_and_seed_database():
                         db.add(berth)
 
         db.commit()
-        print("[✓] Database successfully reset and seeded with Kolkata & West Bengal Trains!")
-        print(f"[✓] Total Trains: {len(kolkata_trains)} | Total Dummy Bookings: 0 (All Berths 100% Available)")
+        print("[OK] Database successfully reset and seeded with Kolkata & West Bengal Trains!")
+        print(f"[OK] Total Trains: {len(kolkata_trains)} | Total Dummy Bookings: 0 (All Berths 100% Available)")
     finally:
         db.close()
 
