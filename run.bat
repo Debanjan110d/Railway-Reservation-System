@@ -10,3 +10,4 @@ if %ERRORLEVEL% NEQ 0 (
     echo [!] Launcher exited with an error. Check logs\error.log for details.
     pause
 )
+

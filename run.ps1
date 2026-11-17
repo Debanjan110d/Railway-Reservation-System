@@ -127,9 +127,9 @@ try {
 # -----------------------------------------------------------------------------
 # Step 4: Start FastAPI Backend on 127.0.0.1:8000
 # -----------------------------------------------------------------------------
-Write-Host "[*] Starting FastAPI Backend on http://127.0.0.1:8000..." -ForegroundColor Green
+Write-Host "[*] Starting FastAPI Backend on http://0.0.0.0:8000..." -ForegroundColor Green
 try {
-    $BackendProcess = Start-Process python -ArgumentList "-m uvicorn app.main:app --app-dir `"$ProjectRoot\backend`" --host 127.0.0.1 --port 8000" -PassThru -NoNewWindow
+    $BackendProcess = Start-Process python -ArgumentList "-m uvicorn app.main:app --app-dir `"$ProjectRoot\backend`" --host 0.0.0.0 --port 8000" -PassThru -NoNewWindow
     Log-InfoMsg "FastAPI Backend started with PID $($BackendProcess.Id)."
 } catch {
     Log-ErrorMsg "Failed to start FastAPI Backend: $_"
@@ -138,12 +138,12 @@ try {
 Start-Sleep -Seconds 2
 
 # -----------------------------------------------------------------------------
-# Step 5: Start Next.js Frontend on http://localhost:3000
+# Step 5: Start Next.js Frontend on http://0.0.0.0:3000
 # -----------------------------------------------------------------------------
-Write-Host "[*] Starting Next.js Frontend on http://localhost:3000..." -ForegroundColor Green
+Write-Host "[*] Starting Next.js Frontend on http://0.0.0.0:3000..." -ForegroundColor Green
 try {
     Set-Location "$ProjectRoot\frontend"
-    $FrontendProcess = Start-Process "cmd.exe" -ArgumentList "/c npm run dev -- -p 3000" -PassThru -NoNewWindow
+    $FrontendProcess = Start-Process "cmd.exe" -ArgumentList "/c npm run dev -- -H 0.0.0.0 -p 3000" -PassThru -NoNewWindow
     Set-Location $ProjectRoot
     Log-InfoMsg "Next.js Frontend started with PID $($FrontendProcess.Id)."
 } catch {

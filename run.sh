@@ -7,7 +7,6 @@
 
 set -e
 
-# Change directory to project root
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_ROOT"
 
@@ -18,9 +17,35 @@ echo "================================================================="
 # Set Python Path for backend modules
 export PYTHONPATH="$PROJECT_ROOT/backend"
 
-# Step 1: Initialize and Seed SQLite Database
-echo "[*] Step 1: Initializing Database & Seed Trains/Coaches..."
-python "$PROJECT_ROOT/backend/app/database/seed.py"
+# Prerequisite verification
+command -v python3 >/dev/null 2>&1 || { echo "[!] Python 3 is required but not installed. Aborting."; exit 1; }
+command -v node >/dev/null 2>&1 || { echo "[!] Node.js is required but not installed. Aborting."; exit 1; }
+command -v npm >/dev/null 2>&1 || { echo "[!] npm is required but not installed. Aborting."; exit 1; }
+
+# Step 1: Verify & Install Python Dependencies
+echo "[*] Checking Python backend dependencies..."
+if ! python3 -c "import fastapi, uvicorn, sqlalchemy, pydantic" >/dev/null 2>&1; then
+    echo "[!] Missing Python dependencies. Installing via pip..."
+    python3 -m pip install -r "$PROJECT_ROOT/backend/requirements.txt"
+    echo "[✓] Python dependencies installed."
+else
+    echo "[✓] Python backend dependencies verified."
+fi
+
+# Step 2: Verify & Install Frontend Dependencies
+if [ ! -d "$PROJECT_ROOT/frontend/node_modules" ]; then
+    echo "[!] node_modules not found. Running npm install in frontend..."
+    cd "$PROJECT_ROOT/frontend"
+    npm install
+    cd "$PROJECT_ROOT"
+    echo "[✓] Frontend npm packages installed."
+else
+    echo "[✓] Frontend dependencies verified."
+fi
+
+# Step 3: Initialize and Seed Database
+echo "[*] Initializing Database & Seeding Trains/Coaches..."
+python3 "$PROJECT_ROOT/backend/app/database/seed.py"
 
 # Function to clean up background processes on script exit
 cleanup() {
@@ -37,29 +62,26 @@ cleanup() {
 
 trap cleanup SIGINT SIGTERM EXIT
 
-# Step 2: Start Backend (FastAPI via Uvicorn)
-echo "[*] Step 2: Starting FastAPI Backend on http://127.0.0.1:8000..."
-python -m uvicorn app.main:app --app-dir "$PROJECT_ROOT/backend" --host 127.0.0.1 --port 8000 &
+# Step 4: Start Backend (FastAPI via Uvicorn on 0.0.0.0 so LAN access works)
+echo "[*] Starting FastAPI Backend on http://0.0.0.0:8000..."
+python3 -m uvicorn app.main:app --app-dir "$PROJECT_ROOT/backend" --host 0.0.0.0 --port 8000 &
 BACKEND_PID=$!
 
-# Wait briefly for backend to bind
 sleep 2
 
-# Step 3: Start Frontend (Next.js)
-echo "[*] Step 3: Starting Next.js Frontend on http://localhost:3000..."
+# Step 5: Start Frontend (Next.js on 0.0.0.0)
+echo "[*] Starting Next.js Frontend on http://0.0.0.0:3000..."
 cd "$PROJECT_ROOT/frontend"
-npm run dev -- -p 3000 &
+npm run dev -- -H 0.0.0.0 -p 3000 &
 FRONTEND_PID=$!
 
 echo ""
 echo "================================================================="
 echo "   SYSTEM SUCCESSFULLY LAUNCHED!                                "
 echo "   - Frontend UI:      http://localhost:3000                     "
-echo "   - Backend API Docs: http://127.0.0.1:8000/docs                "
-echo "   - DSA Diagnostics:  http://127.0.0.1:8000/api/v1/metrics/dsa  "
+echo "   - Backend API Docs: http://localhost:8000/docs                "
+echo "   - DSA Diagnostics:  http://localhost:8000/api/v1/metrics/dsa  "
 echo "================================================================="
 echo "Press Ctrl+C to terminate both servers."
 
-# Keep script running to wait for process signals
 wait
-
